@@ -47,3 +47,24 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}
+
+// android.jar only has stubs for org.json, so plain JVM tests can't use it.
+// Compile a small copy outside the android classpath and put it first.
+def jsonShim = tasks.register('compileJsonShim', JavaCompile) {
+    source = fileTree('src/testShim/java')
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('jsonShim')
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
+
+tasks.withType(Test).configureEach {
+    dependsOn jsonShim
+    doFirst {
+        classpath = files(jsonShim.get().destinationDirectory) + classpath
+    }
+}

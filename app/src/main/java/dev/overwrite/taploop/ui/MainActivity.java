@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import dev.overwrite.taploop.Prefs;
 import dev.overwrite.taploop.R;
 import dev.overwrite.taploop.capture.CaptureService;
 import dev.overwrite.taploop.model.Macro;
@@ -44,9 +45,12 @@ public class MainActivity extends Activity {
     private Button accBtn, capBtn, panelBtn;
     private View accHint, empty;
     private ListView list;
+    private int theme;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        theme = Prefs.theme(this);
+        setTheme(theme);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -65,6 +69,8 @@ public class MainActivity extends Activity {
         accBtn.setOnClickListener(v -> openAccessibility());
         capBtn.setOnClickListener(v -> toggleCapture());
         panelBtn.setOnClickListener(v -> togglePanel());
+        findViewById(R.id.settings_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsActivity.class)));
         accHint.setOnClickListener(v -> startActivity(new Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.fromParts("package", getPackageName(), null))));
@@ -75,6 +81,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // accent changed in settings
+        if (theme != Prefs.theme(this)) {
+            recreate();
+            return;
+        }
         refresh();
     }
 

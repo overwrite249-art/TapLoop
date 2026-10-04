@@ -11,6 +11,23 @@
         <item name="android:alertDialogTheme">@style/DialogTheme</item>
     </style>
 
+    <!-- accent choices from Settings, only the accent changes -->
+    <style name="AppTheme.Green">
+        <item name="android:colorAccent">#4CC38A</item>
+    </style>
+
+    <style name="AppTheme.Orange">
+        <item name="android:colorAccent">#FFB454</item>
+    </style>
+
+    <style name="AppTheme.Pink">
+        <item name="android:colorAccent">#FF7AB6</item>
+    </style>
+
+    <style name="AppTheme.Purple">
+        <item name="android:colorAccent">#B48CFF</item>
+    </style>
+
     <style name="DialogTheme" parent="@android:style/Theme.Material.Dialog.Alert">
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:background">@color/card</item>

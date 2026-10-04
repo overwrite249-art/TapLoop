@@ -15,6 +15,8 @@ public class Macro {
     /** playback speed in percent, only scales plain delays */
     public int speed = 100;
     public long loopDelay = 0;
+    /** screen size the macro was recorded at, 0 = unknown (older macros) */
+    public int screenW, screenH;
     public final List<Step> steps = new ArrayList<>();
 
     public JSONObject toJson() throws JSONException {
@@ -23,6 +25,7 @@ public class Macro {
         JSONArray arr = new JSONArray();
         for (Step s : steps) arr.put(s.toJson());
         o.put("steps", arr);
+        if (screenW > 0 && screenH > 0) o.put("screenW", screenW).put("screenH", screenH);
         return o;
     }
 
@@ -33,6 +36,8 @@ public class Macro {
         m.loops = o.optInt("loops", 1);
         m.speed = Math.max(10, o.optInt("speed", 100));
         m.loopDelay = o.optLong("loopDelay", 0);
+        m.screenW = Math.max(0, o.optInt("screenW", 0));
+        m.screenH = Math.max(0, o.optInt("screenH", 0));
         JSONArray arr = o.optJSONArray("steps");
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {

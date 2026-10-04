@@ -6,6 +6,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -14,6 +15,7 @@ import android.view.WindowManager;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.overwrite.taploop.Prefs;
 import dev.overwrite.taploop.R;
 import dev.overwrite.taploop.capture.ScreenGrabber;
 import dev.overwrite.taploop.model.Step;
@@ -30,6 +32,7 @@ class Recorder implements View.OnTouchListener {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final List<Step> steps = new ArrayList<>();
     private final int slop;
+    private final boolean haptic;
 
     private View layer;
     private WindowManager.LayoutParams lp;
@@ -48,12 +51,14 @@ class Recorder implements View.OnTouchListener {
     private boolean moved;
     private int downColor = -1;
     private byte[] downPatch;
+    private float downScale = ScreenGrabber.SCALE;
 
     Recorder(TapService svc, WindowManager wm, boolean smart) {
         this.svc = svc;
         this.wm = wm;
         this.smart = smart;
         slop = ViewConfiguration.get(svc).getScaledTouchSlop() * 2;
+        haptic = Prefs.haptic(svc);
     }
 
     int count() {
@@ -115,7 +120,8 @@ class Recorder implements View.OnTouchListener {
                     ScreenGrabber g = ScreenGrabber.get();
                     if (g != null) {
                         downColor = g.colorAt(x, y);
-                        downPatch = g.patchAt(x, y);
+                        downPatch = Prefs.smartImage(svc) ? g.patchAt(x, y) : null;
+                        downScale = g.scale();
                     }
                 }
                 break;
@@ -136,7 +142,7 @@ class Recorder implements View.OnTouchListener {
     }
 
     private void finishTouch(long upTime) {
-        Step s = new Step();
+        Step s = Prefs.newStep(svc);
         s.action = moved ? Step.SWIPE : Step.TAP;
         s.x = downX;
         s.y = downY;
@@ -151,6 +157,7 @@ class Recorder implements View.OnTouchListener {
                 s.cond = Step.COND_IMAGE;
                 s.patch = downPatch;
                 s.patchSize = ScreenGrabber.PATCH;
+                s.patchScale = downScale;
             } else {
                 s.cond = Step.COND_COLOR;
             }
@@ -158,9 +165,15 @@ class Recorder implements View.OnTouchListener {
             // in smart mode we don't wait the recorded time, we wait for the
             // thing to show up. the recorded gap is only used for the timeout.
             s.delay = 0;
-            s.timeout = Math.min(60000, Math.max(3000, gap * 3 + 2000));
+            s.recGap = gap;
+            s.timeout = Math.min(Prefs.smartMaxWait(svc), Math.max(3000, gap * 3 + 2000));
+            s.searchRadius = Prefs.smartRadius(svc);
+            s.onMiss = Prefs.smartMiss(svc);
         }
         steps.add(s);
+        if (haptic && layer != null) {
+            layer.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+        }
         svc.onRecorded();
         passThrough(s);
     }

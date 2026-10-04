@@ -1,9 +1,9 @@
 package dev.overwrite.taploop.model;
 
-import android.util.Base64;
-
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.Base64;
 
 public class Step {
     public static final int TAP = 0;
@@ -34,6 +34,10 @@ public class Step {
     public int searchRadius;
     public int patchSize;
     public byte[] patch;
+    /** capture scale the patch was taken at, older macros were always 0.5 */
+    public float patchScale = 0.5f;
+    /** smart record: the real gap before this tap, used when capture is off. -1 = unknown */
+    public long recGap = -1;
 
     public Step copy() {
         Step s = new Step();
@@ -42,6 +46,7 @@ public class Step {
         s.cond = cond; s.color = color; s.tolerance = tolerance; s.timeout = timeout;
         s.onMiss = onMiss; s.searchRadius = searchRadius;
         s.patchSize = patchSize; s.patch = patch;
+        s.patchScale = patchScale; s.recGap = recGap;
         return s;
     }
 
@@ -54,8 +59,10 @@ public class Step {
         o.put("timeout", timeout).put("miss", onMiss).put("radius", searchRadius);
         if (patch != null) {
             o.put("psize", patchSize);
-            o.put("patch", Base64.encodeToString(patch, Base64.NO_WRAP));
+            o.put("patch", Base64.getEncoder().encodeToString(patch));
+            o.put("pscale", (double) patchScale);
         }
+        if (recGap >= 0) o.put("gap", recGap);
         return o;
     }
 
@@ -70,9 +77,16 @@ public class Step {
         s.onMiss = o.optInt("miss"); s.searchRadius = o.optInt("radius");
         String p = o.optString("patch", null);
         if (p != null && !p.isEmpty()) {
-            s.patch = Base64.decode(p, Base64.NO_WRAP);
-            s.patchSize = o.optInt("psize");
+            try {
+                s.patch = Base64.getMimeDecoder().decode(p);
+                s.patchSize = o.optInt("psize");
+            } catch (IllegalArgumentException e) {
+                s.patch = null;
+            }
+            double ps = o.optDouble("pscale", 0.5);
+            s.patchScale = ps > 0.05 && ps <= 1 ? (float) ps : 0.5f;
         }
+        s.recGap = o.optLong("gap", -1);
         if (s.cond == COND_IMAGE && s.patch == null) s.cond = COND_NONE;
         return s;
     }

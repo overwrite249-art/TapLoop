@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
@@ -19,6 +20,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.WindowManager;
 
+import dev.overwrite.taploop.Prefs;
 import dev.overwrite.taploop.R;
 import dev.overwrite.taploop.ui.MainActivity;
 
@@ -97,13 +99,23 @@ public class CaptureService extends Service {
 
             Rect size = screenSize();
             ScreenGrabber.start(mp, size.width(), size.height(),
-                    getResources().getDisplayMetrics().densityDpi);
+                    getResources().getDisplayMetrics().densityDpi, Prefs.captureScale(this));
             running = true;
         } catch (Exception e) {
             Log.e(TAG, "couldn't start capture", e);
             shutdown();
         }
         return START_NOT_STICKY;
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // rotation: keep the frame the same shape as the screen so coords still line up
+        ScreenGrabber g = ScreenGrabber.get();
+        if (g == null) return;
+        Rect size = screenSize();
+        g.resize(size.width(), size.height(), g.scale());
     }
 
     @SuppressWarnings("deprecation")

@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import dev.overwrite.taploop.Prefs;
 import dev.overwrite.taploop.R;
 import dev.overwrite.taploop.capture.ScreenGrabber;
 import dev.overwrite.taploop.model.Macro;
@@ -61,6 +62,8 @@ public class TapService extends AccessibilityService {
         wm = getSystemService(WindowManager.class);
         prefs = getSharedPreferences("state", MODE_PRIVATE);
         active = MacroStore.load(this, prefs.getString("active", null));
+        String cut = RunGuard.takeInterrupted(this);
+        if (cut != null) toast("\"" + cut + "\" was cut off last time, TapLoop got restarted");
     }
 
     @Override
@@ -74,6 +77,7 @@ public class TapService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        if (player != null) player.cancel("Accessibility service was turned off, playback stopped");
         stopAll();
         hidePanel();
         instance = null;
@@ -204,6 +208,9 @@ public class TapService extends AccessibilityService {
                 String time = new SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(new Date());
                 m.name = (wasSmart ? "Smart " : "Recording ") + time;
                 m.steps.addAll(steps);
+                int[] size = ScreenFit.screenSize(this);
+                m.screenW = size[0];
+                m.screenH = size[1];
                 MacroStore.save(this, m);
                 setActive(m);
                 toast("Saved " + steps.size() + " steps");
@@ -245,9 +252,11 @@ public class TapService extends AccessibilityService {
         }
         player = new Player(this, active, reason -> main.post(() -> {
             player = null;
+            if (panel != null) panel.setKeepScreenOn(false);
             updatePanel();
             if (reason != null) toast(reason);
         }));
+        if (panel != null) panel.setKeepScreenOn(Prefs.keepScreenOn(this));
         updatePanel();
         player.start();
     }
@@ -277,7 +286,8 @@ public class TapService extends AccessibilityService {
                 .build();
     }
 
-    void dispatch(GestureDescription g, Runnable done) {
+    /** returns false if the system refused the gesture */
+    boolean dispatch(GestureDescription g, Runnable done) {
         boolean ok = dispatchGesture(g, new GestureResultCallback() {
             @Override
             public void onCompleted(GestureDescription gestureDescription) {
@@ -290,16 +300,20 @@ public class TapService extends AccessibilityService {
             }
         }, main);
         if (!ok) main.post(done);
+        return ok;
     }
 
-    /** called from the player thread, returns false if it timed out */
+    /** called from the player thread, returns false if it timed out or was refused */
     boolean dispatchAndWait(GestureDescription g, long duration) throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(1);
-        main.post(() -> dispatch(g, latch::countDown));
-        return latch.await(duration + 3000, TimeUnit.MILLISECONDS);
+        boolean[] sent = {true};
+        main.post(() -> sent[0] = dispatch(g, latch::countDown));
+        return latch.await(duration + 3000, TimeUnit.MILLISECONDS) && sent[0];
     }
 
     void toast(String s) {
-        main.post(() -> Toast.makeText(this, s, Toast.LENGTH_SHORT).show());
+        // app context, so this still works while the service is going down
+        Context app = getApplicationContext();
+        main.post(() -> Toast.makeText(app, s, Toast.LENGTH_SHORT).show());
     }
 }

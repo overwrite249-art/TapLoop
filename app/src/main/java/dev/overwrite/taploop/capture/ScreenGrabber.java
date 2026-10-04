@@ -9,15 +9,18 @@ import android.media.projection.MediaProjection;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
+import android.util.Log;
 
 import java.nio.ByteBuffer;
 
 /**
- * Keeps the latest screen frame in memory (at half resolution) so we can
- * check colors and small image patches quickly.
+ * Keeps the latest screen frame in memory (half resolution by default, see
+ * the capture scale setting) so we can check colors and small image patches quickly.
  * All coordinates passed in are real screen pixels.
  */
 public final class ScreenGrabber {
+    private static final String TAG = "ScreenGrabber";
+    /** default capture scale, also what patches from older versions were taken at */
     public static final float SCALE = 0.5f;
     /** patch side length in frame pixels (= 2x that on screen) */
     public static final int PATCH = 16;
@@ -30,30 +33,118 @@ public final class ScreenGrabber {
 
     private final Object lock = new Object();
     private final HandlerThread thread;
-    private final ImageReader reader;
+    private final Handler handler;
     private final VirtualDisplay display;
-    private final int w, h;
+    private final int dpi;
+    // only touched on the grabber thread
+    private volatile ImageReader reader;
+    private volatile int screenW, screenH;
+    private volatile boolean stopped;
 
+    // guarded by lock
+    private int w, h;
+    private float scale;
     private byte[] frame;
     private int stride;
     private long frameTime;
 
-    private ScreenGrabber(MediaProjection mp, int screenW, int screenH, int dpi) {
-        w = Math.max(1, Math.round(screenW * SCALE));
-        h = Math.max(1, Math.round(screenH * SCALE));
+    private ScreenGrabber(MediaProjection mp, int screenW, int screenH, int dpi, float scale) {
+        this.dpi = dpi;
+        this.screenW = screenW;
+        this.screenH = screenH;
+        this.scale = cleanScale(scale);
+        w = dim(screenW, this.scale);
+        h = dim(screenH, this.scale);
         thread = new HandlerThread("grabber");
         thread.start();
-        Handler handler = new Handler(thread.getLooper());
-        reader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2);
-        reader.setOnImageAvailableListener(this::onImage, handler);
-        display = mp.createVirtualDisplay("taploop", w, h, dpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                reader.getSurface(), null, handler);
+        handler = new Handler(thread.getLooper());
+        reader = newReader(w, h);
+        try {
+            display = mp.createVirtualDisplay("taploop", w, h, dpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    reader.getSurface(), null, handler);
+        } catch (RuntimeException e) {
+            reader.close();
+            thread.quitSafely();
+            throw e;
+        }
     }
 
     static void start(MediaProjection mp, int screenW, int screenH, int dpi) {
+        start(mp, screenW, screenH, dpi, SCALE);
+    }
+
+    static void start(MediaProjection mp, int screenW, int screenH, int dpi, float scale) {
         stop();
-        current = new ScreenGrabber(mp, screenW, screenH, dpi);
+        current = new ScreenGrabber(mp, screenW, screenH, dpi, scale);
+    }
+
+    private static float cleanScale(float s) {
+        return s > 0.05f && s <= 1f ? s : SCALE;
+    }
+
+    private static int dim(int screen, float scale) {
+        return Math.max(1, Math.round(screen * scale));
+    }
+
+    private ImageReader newReader(int w, int h) {
+        ImageReader r = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2);
+        r.setOnImageAvailableListener(this::onImage, handler);
+        return r;
+    }
+
+    public float scale() {
+        synchronized (lock) {
+            return scale;
+        }
+    }
+
+    /** true once capture was shut down, the object is useless after that */
+    public boolean isStopped() {
+        return stopped;
+    }
+
+    public void setScale(float s) {
+        resize(screenW, screenH, s);
+    }
+
+    /**
+     * Screen rotated or the scale setting changed. Android 14 only allows one
+     * virtual display per projection, so we resize it and swap in a new reader.
+     */
+    public void resize(int newScreenW, int newScreenH, float newScale) {
+        if (newScreenW <= 0 || newScreenH <= 0) return;
+        handler.post(() -> {
+            if (stopped) return;
+            float s = cleanScale(newScale);
+            int nw = dim(newScreenW, s), nh = dim(newScreenH, s);
+            synchronized (lock) {
+                if (nw == w && nh == h && s == scale) return;
+            }
+            ImageReader old = reader;
+            ImageReader nr = null;
+            try {
+                nr = newReader(nw, nh);
+                display.resize(nw, nh, dpi);
+                display.setSurface(nr.getSurface());
+            } catch (RuntimeException e) {
+                Log.w(TAG, "resize failed", e);
+                if (nr != null) nr.close();
+                return;
+            }
+            reader = nr;
+            screenW = newScreenW;
+            screenH = newScreenH;
+            synchronized (lock) {
+                w = nw;
+                h = nh;
+                scale = s;
+                // old frame has the wrong size, wait for a fresh one
+                frame = null;
+                lock.notifyAll();
+            }
+            old.close();
+        });
     }
 
     static void stop() {
@@ -63,36 +154,52 @@ public final class ScreenGrabber {
     }
 
     private void release() {
-        try { display.release(); } catch (Exception ignored) {}
-        try { reader.close(); } catch (Exception ignored) {}
-        thread.quitSafely();
+        stopped = true;
         synchronized (lock) {
             frame = null;
             lock.notifyAll();
         }
+        // close on the grabber thread so the reader never goes away under onImage
+        Runnable close = () -> {
+            try { display.release(); } catch (Exception ignored) {}
+            try { reader.close(); } catch (Exception ignored) {}
+            thread.quitSafely();
+        };
+        if (!handler.post(close)) close.run();
     }
 
     private void onImage(ImageReader r) {
         Image img;
         try {
             img = r.acquireLatestImage();
-        } catch (IllegalStateException e) {
+        } catch (RuntimeException e) {
+            // reader closed, or maxImages hit
             return;
         }
         if (img == null) return;
         try {
-            Image.Plane p = img.getPlanes()[0];
+            if (r != reader || stopped) return;
+            Image.Plane[] planes = img.getPlanes();
+            if (planes == null || planes.length == 0) return;
+            Image.Plane p = planes[0];
+            int iw = img.getWidth(), ih = img.getHeight();
+            int ps = p.getPixelStride(), rs = p.getRowStride();
             ByteBuffer buf = p.getBuffer();
             int n = buf.remaining();
+            // some drivers give odd strides or skip the padding on the last row
+            if (ps != 4 || rs < iw * 4 || n < (ih - 1) * rs + iw * 4) return;
             synchronized (lock) {
+                if (iw != w || ih != h) return;
                 if (frame == null || frame.length < n) frame = new byte[n];
                 buf.get(frame, 0, n);
-                stride = p.getRowStride();
+                stride = rs;
                 frameTime = SystemClock.uptimeMillis();
                 lock.notifyAll();
             }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "bad frame", e);
         } finally {
-            img.close();
+            try { img.close(); } catch (RuntimeException ignored) {}
         }
     }
 
@@ -112,7 +219,7 @@ public final class ScreenGrabber {
     public void awaitFrame(long since, long maxMs) throws InterruptedException {
         long end = SystemClock.uptimeMillis() + maxMs;
         synchronized (lock) {
-            while (frameTime <= since && frame != null) {
+            while (frameTime <= since && !stopped) {
                 long left = end - SystemClock.uptimeMillis();
                 if (left <= 0) return;
                 lock.wait(left);
@@ -120,8 +227,8 @@ public final class ScreenGrabber {
         }
     }
 
-    private int fx(int sx) { return clamp(Math.round(sx * SCALE), w - 1); }
-    private int fy(int sy) { return clamp(Math.round(sy * SCALE), h - 1); }
+    private int fx(int sx) { return clamp(Math.round(sx * scale), w - 1); }
+    private int fy(int sy) { return clamp(Math.round(sy * scale), h - 1); }
 
     private static int clamp(int v, int max) {
         return v < 0 ? 0 : Math.min(v, max);
@@ -182,13 +289,23 @@ public final class ScreenGrabber {
      * matched (center), or null.
      */
     public int[] findPatch(byte[] patch, int size, int sx, int sy, int radius, int tol) {
+        return findPatch(patch, size, SCALE, sx, sy, radius, tol);
+    }
+
+    /** same, for a patch taken at another capture scale (it gets resized to match) */
+    public int[] findPatch(byte[] patch, int size, float patchScale, int sx, int sy, int radius, int tol) {
         if (patch == null || size <= 0 || patch.length < size * size * 3) return null;
         synchronized (lock) {
             if (frame == null) return null;
+            if (Math.abs(patchScale - scale) > 0.001f && patchScale > 0) {
+                int ns = Math.max(2, Math.round(size * scale / patchScale));
+                patch = resample(patch, size, ns);
+                size = ns;
+            }
             int cx = fx(sx) - size / 2, cy = fy(sy) - size / 2;
             long limit = (long) tol * size * size * 3;
             if (diff(patch, size, cx, cy, limit) <= limit) return new int[]{sx, sy};
-            int r = Math.round(radius * SCALE);
+            int r = Math.round(radius * scale);
             long best = Long.MAX_VALUE;
             int bx = 0, by = 0;
             for (int ring = 1; ring <= r; ring++) {
@@ -201,12 +318,28 @@ public final class ScreenGrabber {
                 }
                 // nearest good match wins, no need to scan further out
                 if (best <= limit) {
-                    return new int[]{Math.round((cx + bx + size / 2f) / SCALE),
-                            Math.round((cy + by + size / 2f) / SCALE)};
+                    return new int[]{Math.round((cx + bx + size / 2f) / scale),
+                            Math.round((cy + by + size / 2f) / scale)};
                 }
             }
             return null;
         }
+    }
+
+    /** nearest neighbour resize of an RGB patch */
+    static byte[] resample(byte[] src, int size, int ns) {
+        byte[] out = new byte[ns * ns * 3];
+        for (int y = 0; y < ns; y++) {
+            int syy = Math.min(size - 1, y * size / ns);
+            for (int x = 0; x < ns; x++) {
+                int sxx = Math.min(size - 1, x * size / ns);
+                int si = (syy * size + sxx) * 3, di = (y * ns + x) * 3;
+                out[di] = src[si];
+                out[di + 1] = src[si + 1];
+                out[di + 2] = src[si + 2];
+            }
+        }
+        return out;
     }
 
     private long diff(byte[] patch, int size, int x0, int y0, long stopAt) {

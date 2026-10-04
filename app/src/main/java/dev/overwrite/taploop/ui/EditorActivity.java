@@ -16,6 +16,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import dev.overwrite.taploop.Prefs;
 import dev.overwrite.taploop.R;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
@@ -30,6 +31,7 @@ public class EditorActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        setTheme(Prefs.theme(this));
         super.onCreate(savedInstanceState);
         macro = MacroStore.load(this, getIntent().getStringExtra("id"));
         if (macro == null) {
@@ -59,7 +61,7 @@ public class EditorActivity extends Activity {
         });
 
         findViewById(R.id.add).setOnClickListener(v -> {
-            Step s = new Step();
+            Step s = Prefs.newStep(this);
             if (!macro.steps.isEmpty()) {
                 Step last = macro.steps.get(macro.steps.size() - 1);
                 s.x = last.x;
