@@ -81,6 +81,13 @@
             android:textStyle="bold" />
 
         <Button
+            android:id="@+id/preview"
+            style="@style/Btn"
+            android:layout_height="34dp"
+            android:layout_marginEnd="8dp"
+            android:text="Preview" />
+
+        <Button
             android:id="@+id/add"
             style="@style/Btn"
             android:layout_height="34dp"

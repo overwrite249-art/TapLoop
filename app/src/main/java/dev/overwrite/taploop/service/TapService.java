@@ -76,6 +76,7 @@ public class TapService extends AccessibilityService {
     public void onDestroy() {
         stopAll();
         hidePanel();
+        closeOverlay();
         instance = null;
         super.onDestroy();
     }
@@ -263,6 +264,28 @@ public class TapService extends AccessibilityService {
 
     public boolean isBusy() {
         return player != null || recorder != null;
+    }
+
+    // ---- picker / preview ----
+
+    private ScreenOverlay overlay;
+
+    /** crosshair picker, from = start point of a swipe to draw a line from, or null */
+    public boolean showPicker(int x, int y, int[] from, boolean wantColor, PickerOverlay.Listener l) {
+        closeOverlay();
+        overlay = new PickerOverlay(this, x, y, from, wantColor, l);
+        return overlay.show();
+    }
+
+    public boolean showPreview(List<Step> steps, PreviewOverlay.Listener l) {
+        closeOverlay();
+        overlay = new PreviewOverlay(this, steps, l);
+        return overlay.show();
+    }
+
+    public void closeOverlay() {
+        if (overlay != null) overlay.close(false);
+        overlay = null;
     }
 
     // ---- gestures ----

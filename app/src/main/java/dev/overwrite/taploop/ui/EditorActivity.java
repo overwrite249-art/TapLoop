@@ -73,6 +73,8 @@ public class EditorActivity extends Activity {
             changed();
             editStep(macro.steps.size() - 1);
         });
+        findViewById(R.id.preview).setOnClickListener(v ->
+                ScreenPick.preview(this, macro.steps, this::editFromPreview));
         findViewById(R.id.save).setOnClickListener(v -> {
             save();
             finish();
@@ -159,6 +161,10 @@ public class EditorActivity extends Activity {
         View endRow = v.findViewById(R.id.end_row), durBox = v.findViewById(R.id.dur_box);
         View condBox = v.findViewById(R.id.cond_box), colorBox = v.findViewById(R.id.color_box);
         View radiusBox = v.findViewById(R.id.radius_box);
+        View pickRow = v.findViewById(R.id.pick_row), pickEnd = v.findViewById(R.id.pick_end);
+        v.findViewById(R.id.pick).setOnClickListener(b -> ScreenPick.point(this, x, y, null, color, cond));
+        pickEnd.setOnClickListener(b -> ScreenPick.point(this, x2, y2,
+                new int[]{num(x, s.x), num(y, s.y)}, null, null));
 
         action.setAdapter(spinner("Tap / hold", "Swipe", "Just wait"));
         String[] condNames = s.patch != null
@@ -185,6 +191,8 @@ public class EditorActivity extends Activity {
             int a = action.getSelectedItemPosition();
             int c = cond.getSelectedItemPosition();
             endRow.setVisibility(a == Step.SWIPE ? View.VISIBLE : View.GONE);
+            pickRow.setVisibility(a == Step.WAIT ? View.GONE : View.VISIBLE);
+            pickEnd.setVisibility(a == Step.SWIPE ? View.VISIBLE : View.GONE);
             durBox.setVisibility(a == Step.WAIT ? View.INVISIBLE : View.VISIBLE);
             condBox.setVisibility(c == Step.COND_NONE ? View.GONE : View.VISIBLE);
             colorBox.setVisibility(c == Step.COND_COLOR ? View.VISIBLE : View.GONE);
@@ -235,6 +243,21 @@ public class EditorActivity extends Activity {
                     changed();
                 })
                 .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void editFromPreview(int[] hits) {
+        if (hits.length == 1) {
+            if (hits[0] < macro.steps.size()) editStep(hits[0]);
+            return;
+        }
+        String[] items = new String[hits.length];
+        for (int i = 0; i < hits.length; i++) {
+            items[i] = (hits[i] + 1) + ". " + macro.steps.get(hits[i]).summary();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Steps here")
+                .setItems(items, (d, w) -> editStep(hits[w]))
                 .show();
     }
 

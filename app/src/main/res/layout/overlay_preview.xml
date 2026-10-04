@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="12dp"
+    android:layout_marginEnd="12dp"
+    android:background="@drawable/card"
+    android:clickable="true"
+    android:focusable="false"
+    android:gravity="center_vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/info"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_weight="1"
+        android:textColor="@color/text"
+        android:textSize="13sp" />
+
+    <Button
+        android:id="@+id/move"
+        style="@style/Btn"
+        android:layout_marginEnd="8dp"
+        android:text="Move bar" />
+
+    <Button
+        android:id="@+id/done"
+        style="@style/Btn"
+        android:background="@drawable/btn_accent"
+        android:text="Done"
+        android:textColor="#0F1115"
+        android:textStyle="bold" />
+</LinearLayout>
