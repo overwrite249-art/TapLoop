@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">TapLoop</string>
+    <string name="service_label">TapLoop gestures</string>
+    <string name="service_description">Lets TapLoop record your taps and play them back. It shows a small floating panel and sends taps/swipes for you. It does not read screen text or what you type.</string>
+</resources>
