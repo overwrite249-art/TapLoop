@@ -112,16 +112,20 @@ class FloatingPanel {
         shown = false;
     }
 
-    void bringToFront() {
-        if (!shown) return;
+    /** false if the panel couldn't be put back */
+    boolean bringToFront() {
+        if (!shown) return true;
         closePopup();
+        boolean ok;
         if (collapsed) {
             remove(bubble);
-            add(bubble, bubbleLp);
+            ok = add(bubble, bubbleLp);
         } else {
             remove(panel);
-            add(panel, panelLp);
+            ok = add(panel, panelLp);
         }
+        if (!ok) shown = false;
+        return ok;
     }
 
     // ---- building ----
@@ -659,7 +663,8 @@ class FloatingPanel {
 
     private void remove(View v) {
         if (v == null || !v.isAttachedToWindow()) return;
-        try { wm.removeView(v); } catch (Exception ignored) {}
+        // immediate, removeView() detaches later and a re-add right after would be skipped
+        try { wm.removeViewImmediate(v); } catch (Exception ignored) {}
     }
 
     private void relayout(View v, WindowManager.LayoutParams lp) {

@@ -127,8 +127,8 @@ public class TapService extends AccessibilityService {
     }
 
     /** removes and re-adds the panel so it sits above the record layer */
-    void bringPanelToFront() {
-        if (panelUi != null) panelUi.bringToFront();
+    boolean bringPanelToFront() {
+        return panelUi == null || panelUi.bringToFront();
     }
 
     void setStatus(String s) {
@@ -198,7 +198,12 @@ public class TapService extends AccessibilityService {
         recorder = new Recorder(this, wm, smart);
         recorder.mode = SmartMode.get(this);
         recorder.start();
-        bringPanelToFront();
+        if (!bringPanelToFront()) {
+            // without the panel there'd be no way to stop it
+            recorder.stop();
+            recorder = null;
+            toast("Couldn't show the panel over the record layer, recording cancelled");
+        }
         updatePanel();
     }
 
