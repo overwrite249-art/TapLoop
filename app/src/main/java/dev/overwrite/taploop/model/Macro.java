@@ -11,7 +11,8 @@ public class Macro {
     public String id;
     public String name = "Untitled";
     /** 0 = loop forever */
-    public int loops = 1;
+    /** 0 = forever, the default for new recordings */
+    public int loops = 0;
     /** playback speed in percent, only scales plain delays */
     public int speed = 100;
     public long loopDelay = 0;

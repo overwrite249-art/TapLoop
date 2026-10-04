@@ -6,6 +6,13 @@
     android:orientation="vertical"
     android:padding="14dp">
 
+    <LinearLayout
+        android:id="@+id/macro_box"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:orientation="vertical" />
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -23,7 +30,7 @@
         android:id="@+id/size"
         android:layout_width="match_parent"
         android:layout_height="32dp"
-        android:max="8" />
+        android:max="10" />
 
     <TextView
         android:id="@+id/opacity_label"

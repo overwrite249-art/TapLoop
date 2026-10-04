@@ -52,6 +52,10 @@ class FloatingPanel {
     private Context ui;
     private int slop;
 
+    /** panel size in percent of normal until the user picks one */
+    static final int DEFAULT_SCALE = 80;
+    private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+
     private View panel;
     private WindowManager.LayoutParams panelLp;
     private TextView status;
@@ -133,7 +137,7 @@ class FloatingPanel {
     @SuppressLint({"InflateParams", "ClickableViewAccessibility"})
     private void build() {
         // size setting works by inflating with a scaled density
-        float scale = prefs.getInt("scale", 100) / 100f;
+        float scale = prefs.getInt("scale", DEFAULT_SCALE) / 100f;
         Configuration conf = new Configuration(svc.getResources().getConfiguration());
         conf.densityDpi = Math.round(conf.densityDpi * scale);
         ui = new ContextThemeWrapper(svc.createConfigurationContext(conf), R.style.AppTheme);
@@ -599,23 +603,25 @@ class FloatingPanel {
         TextView opacityLabel = v.findViewById(R.id.opacity_label);
         CompoundButton ind = v.findViewById(R.id.indicators);
 
-        // size 70..150 %, opacity 30..100 %
-        size.setProgress((prefs.getInt("scale", 100) - 70) / 10);
+        buildMacroSettings(v.findViewById(R.id.macro_box));
+
+        // size 50..150 %, opacity 30..100 %
+        size.setProgress((prefs.getInt("scale", DEFAULT_SCALE) - 50) / 10);
         opacity.setProgress((prefs.getInt("opacity", 100) - 30) / 5);
-        sizeLabel.setText(String.format(Locale.US, "Size  %d%%", prefs.getInt("scale", 100)));
+        sizeLabel.setText(String.format(Locale.US, "Size  %d%%", prefs.getInt("scale", DEFAULT_SCALE)));
         opacityLabel.setText(String.format(Locale.US, "Opacity  %d%%", prefs.getInt("opacity", 100)));
         ind.setChecked(prefs.getBoolean("indicators", false));
 
         size.setOnSeekBarChangeListener(new SeekListener() {
             @Override
             public void onProgressChanged(SeekBar s, int p, boolean user) {
-                sizeLabel.setText(String.format(Locale.US, "Size  %d%%", 70 + p * 10));
+                sizeLabel.setText(String.format(Locale.US, "Size  %d%%", 50 + p * 10));
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar s) {
-                int val = 70 + s.getProgress() * 10;
-                if (val == prefs.getInt("scale", 100)) return;
+                int val = 50 + s.getProgress() * 10;
+                if (val == prefs.getInt("scale", DEFAULT_SCALE)) return;
                 prefs.edit().putInt("scale", val).apply();
                 // re-inflating closes this popup, which is fine
                 rebuild();
@@ -640,6 +646,123 @@ class FloatingPanel {
         ind.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("indicators", on).apply());
         v.findViewById(R.id.done).setOnClickListener(b -> closePopup());
         return v;
+    }
+
+    /** loops / speed / pauses of the loaded macro, with -/+ buttons so no keyboard is needed */
+    private void buildMacroSettings(LinearLayout box) {
+        Macro m = svc.getActive();
+        if (m == null) {
+            box.setVisibility(View.GONE);
+            return;
+        }
+        TextView title = new TextView(ui);
+        title.setText(m.name);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setTextColor(svc.getColor(R.color.text));
+        title.setTextSize(15);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        box.addView(title);
+        boolean busy = svc.isBusy();
+        if (busy) {
+            TextView note = new TextView(ui);
+            note.setText("Stop it to change these");
+            note.setTextColor(svc.getColor(R.color.muted));
+            note.setTextSize(11);
+            box.addView(note);
+        }
+        stepper(box, "Loops", busy, () -> m.loops, v -> m.loops = v, 1, 10, 0, 1_000_000,
+                v -> v == 0 ? "∞" : String.valueOf(v), m);
+        stepper(box, "Speed", busy, () -> m.speed, v -> m.speed = v, 10, 50, 10, 1000,
+                v -> v + "%", m);
+        stepper(box, "Pause between loops", busy, () -> (int) m.loopDelay, v -> m.loopDelay = v,
+                100, 1000, 0, 86_400_000, FloatingPanel::ms, m);
+        stepper(box, "Random extra pause", busy, () -> (int) m.loopJitter, v -> m.loopJitter = v,
+                100, 1000, 0, 86_400_000, FloatingPanel::ms, m);
+        stepper(box, "Stop after", busy, () -> m.maxMinutes, v -> m.maxMinutes = v, 1, 10, 0, 100_000,
+                v -> v == 0 ? "never" : v + " min", m);
+    }
+
+    private static String ms(int v) {
+        if (v == 0) return "0";
+        if (v < 1000) return v + " ms";
+        return v % 1000 == 0 ? v / 1000 + " s" : String.format(Locale.US, "%.1f s", v / 1000f);
+    }
+
+    private interface IntGet { int get(); }
+    private interface IntSet { void set(int v); }
+    private interface IntFmt { String fmt(int v); }
+
+    /** tap -/+ for small steps, hold for big ones */
+    private void stepper(LinearLayout box, String label, boolean busy, IntGet get, IntSet set,
+                         int small, int big, int min, int max, IntFmt fmt, Macro m) {
+        float dp = ui.getResources().getDisplayMetrics().density;
+        TextView l = new TextView(ui);
+        l.setText(label);
+        l.setTextColor(svc.getColor(R.color.muted));
+        l.setTextSize(11);
+        l.setPadding(0, Math.round(6 * dp), 0, Math.round(2 * dp));
+        box.addView(l);
+
+        LinearLayout row = new LinearLayout(ui);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView val = new TextView(ui);
+        val.setGravity(Gravity.CENTER);
+        val.setTextColor(svc.getColor(R.color.text));
+        val.setTextSize(14);
+        val.setText(fmt.fmt(get.get()));
+        int h = Math.round(32 * dp);
+        Button minus = smallBtn("−"), plus = smallBtn("+");
+        row.addView(minus, new LinearLayout.LayoutParams(Math.round(44 * dp), h));
+        row.addView(val, new LinearLayout.LayoutParams(0, h, 1));
+        row.addView(plus, new LinearLayout.LayoutParams(Math.round(44 * dp), h));
+        box.addView(row);
+        if (busy) {
+            minus.setEnabled(false);
+            plus.setEnabled(false);
+            return;
+        }
+        Runnable[] save = new Runnable[1];
+        save[0] = () -> {
+            MacroStore.save(svc, m);
+            svc.setActive(m);
+        };
+        java.util.function.IntConsumer by = d -> {
+            int v = (int) Math.max(min, Math.min(max, (long) get.get() + d));
+            if (v == get.get()) return;
+            set.set(v);
+            val.setText(fmt.fmt(v));
+            // write once things settle instead of on every tap
+            main.removeCallbacks(save[0]);
+            main.postDelayed(save[0], 400);
+        };
+        minus.setOnClickListener(b -> by.accept(-small));
+        plus.setOnClickListener(b -> by.accept(small));
+        minus.setOnLongClickListener(b -> {
+            by.accept(-big);
+            return true;
+        });
+        plus.setOnLongClickListener(b -> {
+            by.accept(big);
+            return true;
+        });
+    }
+
+    private Button smallBtn(String text) {
+        Button b = new Button(ui);
+        b.setText(text);
+        b.setTextSize(16);
+        b.setAllCaps(false);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+        b.setStateListAnimator(null);
+        b.setBackgroundResource(R.drawable.btn);
+        b.setTextColor(svc.getColor(R.color.text));
+        return b;
     }
 
     private abstract static class SeekListener implements SeekBar.OnSeekBarChangeListener {
