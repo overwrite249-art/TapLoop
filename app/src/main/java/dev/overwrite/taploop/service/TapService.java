@@ -42,6 +42,7 @@ public class TapService extends AccessibilityService {
 
     private FloatingPanel panelUi;
     private TapIndicator indicator;
+    private TouchBlocker blocker;
 
     private Recorder recorder;
     private Player player;
@@ -60,6 +61,8 @@ public class TapService extends AccessibilityService {
         if (indicator != null) indicator.detach();
         panelUi = new FloatingPanel(this, wm, prefs);
         indicator = new TapIndicator(this, wm);
+        if (blocker != null) blocker.detach();
+        blocker = new TouchBlocker(this, wm);
         if (panelUi.wasShown()) main.post(this::showPanel);
         if (stops != null) stops.end();
         stops = new StopTriggers(this);
@@ -97,6 +100,7 @@ public class TapService extends AccessibilityService {
         closeOverlay();
         if (panelUi != null) panelUi.detach();
         if (indicator != null) indicator.detach();
+        if (blocker != null) blocker.detach();
         instance = null;
         super.onDestroy();
     }
@@ -258,6 +262,7 @@ public class TapService extends AccessibilityService {
             player = null;
             if (stops != null) stops.end();
             if (indicator != null) indicator.detach();
+            if (blocker != null) blocker.detach();
             if (panelUi != null) {
                 panelUi.restoreTouch();
                 panelUi.setKeepScreenOn(false);
@@ -268,6 +273,11 @@ public class TapService extends AccessibilityService {
         if (panelUi != null) {
             panelUi.closePopup();
             panelUi.setKeepScreenOn(Prefs.keepScreenOn(this));
+        }
+        if (blocker != null && FloatingPanel.blockTouches(this)) {
+            blocker.attach();
+            // panel back on top so Stop can still be pressed
+            bringPanelToFront();
         }
         updatePanel();
         player.start();
@@ -341,6 +351,7 @@ public class TapService extends AccessibilityService {
         CountDownLatch ready = new CountDownLatch(1);
         main.post(() -> {
             if (panelUi != null) moved[0] = panelUi.passThrough(x, y, x2, y2);
+            if (blocker != null && blocker.setPassing(true)) moved[0] = true;
             ready.countDown();
         });
         ready.await();
@@ -354,6 +365,7 @@ public class TapService extends AccessibilityService {
         } finally {
             if (moved[0]) main.post(() -> {
                 if (panelUi != null) panelUi.restoreTouch();
+                if (blocker != null) blocker.setPassing(false);
             });
         }
     }

@@ -210,7 +210,8 @@ class Recorder implements View.OnTouchListener {
             s.path = Arrays.copyOf(pts, npts * 3);
             s.path[s.path.length - 1] = (int) s.duration;
         }
-        long gap = Math.max(0, downTime - lastEnd);
+        // first step starts right away, the time before it is just you getting ready
+        long gap = steps.isEmpty() ? 0 : Math.max(0, downTime - lastEnd);
         s.delay = gap;
 
         if (smart && (downPatch != null || downColor != -1)) {

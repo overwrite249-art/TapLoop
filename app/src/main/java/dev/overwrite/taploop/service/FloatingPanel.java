@@ -79,6 +79,10 @@ class FloatingPanel {
         this.prefs = svc.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+    static boolean blockTouches(Context c) {
+        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("block_touch", true);
+    }
+
     static boolean indicatorsOn(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("indicators", false);
     }
@@ -644,6 +648,9 @@ class FloatingPanel {
             }
         });
         ind.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("indicators", on).apply());
+        CompoundButton block = v.findViewById(R.id.block_touch);
+        block.setChecked(prefs.getBoolean("block_touch", true));
+        block.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("block_touch", on).apply());
         v.findViewById(R.id.done).setOnClickListener(b -> closePopup());
         return v;
     }

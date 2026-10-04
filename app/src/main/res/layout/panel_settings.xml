@@ -52,6 +52,14 @@
         android:textColor="@color/text"
         android:textSize="13sp" />
 
+    <Switch
+        android:id="@+id/block_touch"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:text="Block my touches while playing"
+        android:textColor="@color/text"
+        android:textSize="13sp" />
+
     <Button
         android:id="@+id/done"
         style="@style/Btn"
