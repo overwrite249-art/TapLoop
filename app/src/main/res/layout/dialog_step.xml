@@ -187,5 +187,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="44dp" />
         </LinearLayout>
+
+        <include layout="@layout/dialog_step_flow" />
     </LinearLayout>
 </ScrollView>

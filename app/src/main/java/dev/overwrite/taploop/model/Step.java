@@ -9,6 +9,8 @@ public class Step {
     public static final int TAP = 0;
     public static final int SWIPE = 1;
     public static final int WAIT = 2;
+    public static final int GOTO = 3;
+    public static final int STOP = 4;
 
     public static final int COND_NONE = 0;
     public static final int COND_COLOR = 1;
@@ -35,6 +37,19 @@ public class Step {
     public int patchSize;
     public byte[] patch;
 
+    // flow / humanizing, all optional in json
+    public String label = "";
+    /** run this step N times in a row */
+    public int repeat = 1;
+    /** random +/- ms added to delay */
+    public long jitter;
+    /** random tap offset radius in px */
+    public int offset;
+    /** step index to jump to when found (or the target of GOTO), -1 = next */
+    public int goFound = -1;
+    /** step index to jump to when the condition times out, -1 = use onMiss */
+    public int goMiss = -1;
+
     public Step copy() {
         Step s = new Step();
         s.action = action; s.x = x; s.y = y; s.x2 = x2; s.y2 = y2;
@@ -42,6 +57,8 @@ public class Step {
         s.cond = cond; s.color = color; s.tolerance = tolerance; s.timeout = timeout;
         s.onMiss = onMiss; s.searchRadius = searchRadius;
         s.patchSize = patchSize; s.patch = patch;
+        s.label = label; s.repeat = repeat; s.jitter = jitter; s.offset = offset;
+        s.goFound = goFound; s.goMiss = goMiss;
         return s;
     }
 
@@ -52,6 +69,12 @@ public class Step {
         o.put("delay", delay).put("duration", duration);
         o.put("cond", cond).put("color", color).put("tol", tolerance);
         o.put("timeout", timeout).put("miss", onMiss).put("radius", searchRadius);
+        if (!label.isEmpty()) o.put("label", label);
+        if (repeat != 1) o.put("repeat", repeat);
+        if (jitter > 0) o.put("jitter", jitter);
+        if (offset > 0) o.put("offset", offset);
+        if (goFound >= 0) o.put("goFound", goFound);
+        if (goMiss >= 0) o.put("goMiss", goMiss);
         if (patch != null) {
             o.put("psize", patchSize);
             o.put("patch", Base64.encodeToString(patch, Base64.NO_WRAP));
@@ -68,6 +91,12 @@ public class Step {
         s.cond = o.optInt("cond"); s.color = o.optInt("color");
         s.tolerance = o.optInt("tol", 28); s.timeout = o.optLong("timeout", 5000);
         s.onMiss = o.optInt("miss"); s.searchRadius = o.optInt("radius");
+        s.label = o.optString("label", "");
+        s.repeat = Math.max(1, o.optInt("repeat", 1));
+        s.jitter = Math.max(0, o.optLong("jitter"));
+        s.offset = Math.max(0, o.optInt("offset"));
+        s.goFound = o.optInt("goFound", -1);
+        s.goMiss = o.optInt("goMiss", -1);
         String p = o.optString("patch", null);
         if (p != null && !p.isEmpty()) {
             s.patch = Base64.decode(p, Base64.NO_WRAP);
@@ -79,7 +108,10 @@ public class Step {
 
     public String summary() {
         StringBuilder b = new StringBuilder();
+        if (!label.isEmpty()) b.append(label).append(": ");
         switch (action) {
+            case GOTO: b.append("Go to step ").append(goFound >= 0 ? String.valueOf(goFound + 1) : "?"); break;
+            case STOP: b.append("Stop macro"); break;
             case SWIPE: b.append("Swipe ").append(x).append(',').append(y)
                     .append(" → ").append(x2).append(',').append(y2); break;
             case WAIT: b.append("Wait"); break;
@@ -91,9 +123,14 @@ public class Step {
     public String details() {
         StringBuilder b = new StringBuilder();
         b.append("after ").append(delay).append(" ms");
-        if (action != WAIT) b.append(" · ").append(duration).append(" ms down");
+        if (jitter > 0) b.append(" ±").append(jitter);
+        if (action == TAP || action == SWIPE) b.append(" · ").append(duration).append(" ms down");
+        if (repeat > 1) b.append(" · x").append(repeat);
+        if (offset > 0) b.append(" · ±").append(offset).append(" px");
         if (cond == COND_COLOR) b.append(" · color ").append(String.format("#%06X", color & 0xFFFFFF));
         else if (cond == COND_IMAGE) b.append(" · image");
+        if (cond != COND_NONE && action != GOTO && goFound >= 0) b.append(" · found → ").append(goFound + 1);
+        if (cond != COND_NONE && goMiss >= 0) b.append(" · else → ").append(goMiss + 1);
         return b.toString();
     }
 }

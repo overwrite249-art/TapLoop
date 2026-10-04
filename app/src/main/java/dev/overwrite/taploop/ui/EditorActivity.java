@@ -17,6 +17,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import dev.overwrite.taploop.R;
+import dev.overwrite.taploop.model.Jumps;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
 import dev.overwrite.taploop.model.Step;
@@ -24,7 +25,7 @@ import dev.overwrite.taploop.service.TapService;
 
 public class EditorActivity extends Activity {
     private Macro macro;
-    private EditText name, loops, speed, loopDelay;
+    private EditText name, loops, speed, loopDelay, maxMinutes, loopJitter;
     private TextView count;
     private StepAdapter adapter;
 
@@ -43,11 +44,15 @@ public class EditorActivity extends Activity {
         speed = findViewById(R.id.speed);
         loopDelay = findViewById(R.id.loop_delay);
         count = findViewById(R.id.count);
+        maxMinutes = findViewById(R.id.max_minutes);
+        loopJitter = findViewById(R.id.loop_jitter);
 
         name.setText(macro.name);
         loops.setText(String.valueOf(macro.loops));
         speed.setText(String.valueOf(macro.speed));
         loopDelay.setText(String.valueOf(macro.loopDelay));
+        maxMinutes.setText(String.valueOf(macro.maxMinutes));
+        loopJitter.setText(String.valueOf(macro.loopJitter));
 
         ListView list = findViewById(R.id.steps);
         adapter = new StepAdapter();
@@ -103,6 +108,8 @@ public class EditorActivity extends Activity {
         macro.loops = Math.max(0, num(loops, 1));
         macro.speed = Math.max(10, Math.min(1000, num(speed, 100)));
         macro.loopDelay = Math.max(0, num(loopDelay, 0));
+        macro.maxMinutes = Math.max(0, num(maxMinutes, 0));
+        macro.loopJitter = Math.max(0, num(loopJitter, 0));
         MacroStore.save(this, macro);
         TapService svc = TapService.get();
         if (svc != null && !svc.isBusy() && svc.getActive() != null
@@ -127,16 +134,24 @@ public class EditorActivity extends Activity {
                 .setItems(items, (d, which) -> {
                     switch (which) {
                         case 0:
-                            if (pos > 0) macro.steps.add(pos - 1, macro.steps.remove(pos));
+                            if (pos > 0) {
+                                macro.steps.add(pos - 1, macro.steps.remove(pos));
+                                Jumps.swapped(macro.steps, pos, pos - 1);
+                            }
                             break;
                         case 1:
-                            if (pos < macro.steps.size() - 1) macro.steps.add(pos + 1, macro.steps.remove(pos));
+                            if (pos < macro.steps.size() - 1) {
+                                macro.steps.add(pos + 1, macro.steps.remove(pos));
+                                Jumps.swapped(macro.steps, pos, pos + 1);
+                            }
                             break;
                         case 2:
+                            Jumps.inserted(macro.steps, pos + 1);
                             macro.steps.add(pos + 1, macro.steps.get(pos).copy());
                             break;
                         case 3:
                             macro.steps.remove(pos);
+                            Jumps.removed(macro.steps, pos);
                             break;
                     }
                     changed();
@@ -160,7 +175,8 @@ public class EditorActivity extends Activity {
         View condBox = v.findViewById(R.id.cond_box), colorBox = v.findViewById(R.id.color_box);
         View radiusBox = v.findViewById(R.id.radius_box);
 
-        action.setAdapter(spinner("Tap / hold", "Swipe", "Just wait"));
+        action.setAdapter(spinner("Tap / hold", "Swipe", "Just wait", "Go to step", "Stop macro"));
+        StepFlowFields flow = new StepFlowFields(v, s, macro.steps);
         String[] condNames = s.patch != null
                 ? new String[]{"Always (just use the timing)", "Color is at X,Y", "Recorded image is there"}
                 : new String[]{"Always (just use the timing)", "Color is at X,Y"};
@@ -185,10 +201,11 @@ public class EditorActivity extends Activity {
             int a = action.getSelectedItemPosition();
             int c = cond.getSelectedItemPosition();
             endRow.setVisibility(a == Step.SWIPE ? View.VISIBLE : View.GONE);
-            durBox.setVisibility(a == Step.WAIT ? View.INVISIBLE : View.VISIBLE);
+            durBox.setVisibility(a == Step.TAP || a == Step.SWIPE ? View.VISIBLE : View.INVISIBLE);
             condBox.setVisibility(c == Step.COND_NONE ? View.GONE : View.VISIBLE);
             colorBox.setVisibility(c == Step.COND_COLOR ? View.VISIBLE : View.GONE);
             radiusBox.setVisibility(c == Step.COND_IMAGE ? View.VISIBLE : View.INVISIBLE);
+            flow.update(a, c);
         };
         AdapterView.OnItemSelectedListener l = new AdapterView.OnItemSelectedListener() {
             @Override
@@ -232,6 +249,7 @@ public class EditorActivity extends Activity {
                             Toast.makeText(this, "Bad color, kept the old one", Toast.LENGTH_SHORT).show();
                         }
                     }
+                    flow.apply(s);
                     changed();
                 })
                 .setNegativeButton("Cancel", null)

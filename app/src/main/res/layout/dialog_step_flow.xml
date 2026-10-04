@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/goto_box"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView style="@style/Label" android:text="Go to step (number or label)" />
+
+        <EditText
+            android:id="@+id/go_to"
+            style="@style/Field"
+            android:hint="next"
+            android:inputType="textNoSuggestions" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/adv_toggle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:text="Advanced ▸"
+        android:textColor="@color/accent"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:id="@+id/adv_box"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <TextView style="@style/Label" android:text="Label" />
+
+        <EditText
+            android:id="@+id/label"
+            style="@style/Field"
+            android:hint="optional"
+            android:inputType="textNoSuggestions" />
+
+        <LinearLayout
+            android:id="@+id/human_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/repeat_box"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView style="@style/Label" android:text="Repeat" />
+
+                <EditText android:id="@+id/repeat" style="@style/Field" android:inputType="number" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView style="@style/Label" android:text="Wait ± (ms)" />
+
+                <EditText android:id="@+id/jitter" style="@style/Field" android:inputType="number" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/offset_box"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView style="@style/Label" android:text="Tap spread (px)" />
+
+                <EditText android:id="@+id/offset" style="@style/Field" android:inputType="number" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/jump_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/found_box"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView style="@style/Label" android:text="If found, go to" />
+
+                <EditText
+                    android:id="@+id/go_found"
+                    style="@style/Field"
+                    android:hint="next"
+                    android:inputType="textNoSuggestions" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView style="@style/Label" android:text="If not found, go to" />
+
+                <EditText
+                    android:id="@+id/go_miss"
+                    style="@style/Field"
+                    android:hint="as above"
+                    android:inputType="textNoSuggestions" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
