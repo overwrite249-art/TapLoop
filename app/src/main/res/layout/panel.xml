@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/panel_bg"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <TextView
+        android:id="@+id/handle"
+        android:layout_width="56dp"
+        android:layout_height="22dp"
+        android:gravity="center"
+        android:text="• • •"
+        android:textColor="@color/muted"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:paddingBottom="4dp"
+        android:textColor="@color/muted"
+        android:textSize="10sp" />
+
+    <Button
+        android:id="@+id/rec"
+        style="@style/Btn"
+        android:layout_width="56dp"
+        android:layout_marginBottom="4dp"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        android:text="Rec"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/smart"
+        style="@style/Btn"
+        android:layout_width="56dp"
+        android:layout_marginBottom="4dp"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        android:text="Smart"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/play"
+        style="@style/Btn"
+        android:layout_width="56dp"
+        android:layout_marginBottom="4dp"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        android:text="Play"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/close"
+        style="@style/Btn"
+        android:layout_width="56dp"
+        android:layout_height="32dp"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        android:text="Hide"
+        android:textColor="@color/muted"
+        android:textSize="11sp" />
+</LinearLayout>
