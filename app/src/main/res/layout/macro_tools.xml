@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:gravity="center_vertical">
+
+    <EditText
+        android:id="@+id/macro_search"
+        style="@style/Field"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_weight="1"
+        android:background="@drawable/card"
+        android:hint="Search"
+        android:imeOptions="actionSearch"
+        android:importantForAutofill="no"
+        android:inputType="text"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/macro_folder"
+        style="@style/Btn"
+        android:layout_marginStart="6dp"
+        android:ellipsize="end"
+        android:maxWidth="110dp"
+        android:maxLines="1"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:text="All" />
+
+    <Button
+        android:id="@+id/macro_sort"
+        style="@style/Btn"
+        android:layout_marginStart="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:text="Recent" />
+
+    <Button
+        android:id="@+id/macro_more"
+        style="@style/Btn"
+        android:layout_marginStart="6dp"
+        android:contentDescription="Import and backup"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="⋮" />
+</LinearLayout>

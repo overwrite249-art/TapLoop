@@ -27,6 +27,16 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.CropActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="false" />
+
         <service
             android:name=".service.TapService"
             android:exported="false"
@@ -44,5 +54,42 @@
             android:name=".capture.CaptureService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+
+        <activity
+            android:name=".trigger.TriggersActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- shortcut target, launchers start it on our behalf so it can stay unexported -->
+        <activity
+            android:name=".trigger.RunActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
+
+        <receiver
+            android:name=".trigger.ScheduleReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".trigger.PanelTile"
+            android:exported="true"
+            android:icon="@drawable/ic_notif"
+            android:label="TapLoop panel"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+        <provider
+            android:name=".io.ShareProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

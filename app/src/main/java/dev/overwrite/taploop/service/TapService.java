@@ -2,23 +2,17 @@ package dev.overwrite.taploop.service;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
+import android.content.res.Configuration;
 import android.graphics.Path;
-import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.ContextThemeWrapper;
-import android.view.Gravity;
-import android.view.LayoutInflater;
-import android.view.MotionEvent;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
-import android.widget.Button;
-import android.widget.TextView;
+import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
@@ -28,11 +22,12 @@ import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import dev.overwrite.taploop.R;
+import dev.overwrite.taploop.Prefs;
 import dev.overwrite.taploop.capture.ScreenGrabber;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
 import dev.overwrite.taploop.model.Step;
+import dev.overwrite.taploop.trigger.Schedule;
 
 public class TapService extends AccessibilityService {
     private static volatile TapService instance;
@@ -45,14 +40,13 @@ public class TapService extends AccessibilityService {
     private WindowManager wm;
     private SharedPreferences prefs;
 
-    private View panel;
-    private WindowManager.LayoutParams panelLp;
-    private TextView status;
-    private Button recBtn, smartBtn, playBtn;
+    private FloatingPanel panelUi;
+    private TapIndicator indicator;
 
     private Recorder recorder;
     private Player player;
     private Macro active;
+    private StopTriggers stops;
 
     @Override
     protected void onServiceConnected() {
@@ -61,10 +55,33 @@ public class TapService extends AccessibilityService {
         wm = getSystemService(WindowManager.class);
         prefs = getSharedPreferences("state", MODE_PRIVATE);
         active = MacroStore.load(this, prefs.getString("active", null));
+        // can be called again on the same instance after a reconnect, the old windows are dead by then
+        if (panelUi != null) panelUi.detach();
+        if (indicator != null) indicator.detach();
+        panelUi = new FloatingPanel(this, wm, prefs);
+        indicator = new TapIndicator(this, wm);
+        if (panelUi.wasShown()) main.post(this::showPanel);
+        if (stops != null) stops.end();
+        stops = new StopTriggers(this);
+        Schedule.restore(this);
+        String cut = RunGuard.takeInterrupted(this);
+        if (cut != null) toast("\"" + cut + "\" was cut off last time, TapLoop got restarted");
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (panelUi != null) main.post(panelUi::onScreenChanged);
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+    }
+
+    @Override
+    protected boolean onKeyEvent(KeyEvent event) {
+        if (player != null && stops != null && stops.onKey(event)) return true;
+        return super.onKeyEvent(event);
     }
 
     @Override
@@ -74,8 +91,12 @@ public class TapService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        if (player != null) player.cancel("Accessibility service was turned off, playback stopped");
         stopAll();
-        hidePanel();
+        if (stops != null) stops.end();
+        closeOverlay();
+        if (panelUi != null) panelUi.detach();
+        if (indicator != null) indicator.detach();
         instance = null;
         super.onDestroy();
     }
@@ -83,7 +104,7 @@ public class TapService extends AccessibilityService {
     // ---- panel ----
 
     public boolean isPanelShown() {
-        return panel != null;
+        return panelUi != null && panelUi.isShown();
     }
 
     public void setActive(Macro m) {
@@ -97,104 +118,58 @@ public class TapService extends AccessibilityService {
         return active;
     }
 
-    @SuppressLint({"InflateParams", "ClickableViewAccessibility"})
     public void showPanel() {
-        if (panel != null) return;
-        Context themed = new ContextThemeWrapper(this, R.style.AppTheme);
-        panel = LayoutInflater.from(themed).inflate(R.layout.panel, null);
-        status = panel.findViewById(R.id.status);
-        recBtn = panel.findViewById(R.id.rec);
-        smartBtn = panel.findViewById(R.id.smart);
-        playBtn = panel.findViewById(R.id.play);
-
-        recBtn.setOnClickListener(v -> toggleRecord(false));
-        smartBtn.setOnClickListener(v -> toggleRecord(true));
-        playBtn.setOnClickListener(v -> togglePlay());
-        panel.findViewById(R.id.close).setOnClickListener(v -> {
-            stopAll();
-            hidePanel();
-        });
-
-        panelLp = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT);
-        panelLp.gravity = Gravity.TOP | Gravity.START;
-        panelLp.x = prefs.getInt("px", 24);
-        panelLp.y = prefs.getInt("py", 300);
-
-        panel.findViewById(R.id.handle).setOnTouchListener(new View.OnTouchListener() {
-            float sx, sy;
-            int ox, oy;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent e) {
-                switch (e.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        sx = e.getRawX(); sy = e.getRawY();
-                        ox = panelLp.x; oy = panelLp.y;
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        panelLp.x = ox + (int) (e.getRawX() - sx);
-                        panelLp.y = oy + (int) (e.getRawY() - sy);
-                        wm.updateViewLayout(panel, panelLp);
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        prefs.edit().putInt("px", panelLp.x).putInt("py", panelLp.y).apply();
-                        return true;
-                }
-                return false;
-            }
-        });
-
-        wm.addView(panel, panelLp);
-        updatePanel();
+        if (panelUi != null) panelUi.show();
     }
 
     public void hidePanel() {
-        if (panel == null) return;
-        try { wm.removeView(panel); } catch (Exception ignored) {}
-        panel = null;
+        if (panelUi != null) panelUi.hide();
     }
 
     /** removes and re-adds the panel so it sits above the record layer */
     void bringPanelToFront() {
-        if (panel == null) return;
-        try {
-            wm.removeView(panel);
-            wm.addView(panel, panelLp);
-        } catch (Exception ignored) {}
+        if (panelUi != null) panelUi.bringToFront();
     }
 
     void setStatus(String s) {
         main.post(() -> {
-            if (status != null) status.setText(s);
+            if (panelUi != null) panelUi.setStatusText(s);
         });
     }
 
     private void updatePanel() {
-        if (panel == null) return;
-        boolean rec = recorder != null;
-        boolean playing = player != null;
-        recBtn.setText(rec && !recorder.smart ? "Stop" : "Rec");
-        smartBtn.setText(rec && recorder.smart ? "Stop" : "Smart");
-        recBtn.setTextColor(rec && !recorder.smart ? 0xFFFF5A5F : Color.WHITE);
-        smartBtn.setTextColor(rec && recorder.smart ? 0xFFFF5A5F : Color.WHITE);
-        recBtn.setEnabled(!playing && (!rec || !recorder.smart));
-        smartBtn.setEnabled(!playing && (!rec || recorder.smart));
-        playBtn.setEnabled(!rec);
-        playBtn.setText(playing ? "Stop" : "Play");
-        playBtn.setTextColor(playing ? 0xFFFF5A5F : Color.WHITE);
-        if (rec) status.setText("rec " + recorder.count());
-        else if (!playing) status.setText(active == null ? "no macro" : active.name);
+        if (panelUi != null) panelUi.update();
+    }
+
+    void onProgress(int loop, int loops, int step, int steps) {
+        main.post(() -> {
+            if (panelUi != null) panelUi.progress(loop, loops, step, steps);
+        });
+    }
+
+    boolean isRecording() {
+        return recorder != null;
+    }
+
+    boolean isSmartRecording() {
+        return recorder != null && recorder.smart;
+    }
+
+    int recordCount() {
+        return recorder == null ? 0 : recorder.count();
+    }
+
+    boolean isPlaying() {
+        return player != null;
+    }
+
+    boolean isPaused() {
+        return player != null && player.isPaused();
     }
 
     // ---- record ----
 
-    private void toggleRecord(boolean smart) {
+    void toggleRecord(boolean smart) {
         if (recorder != null) {
             List<Step> steps = recorder.stop();
             boolean wasSmart = recorder.smart;
@@ -204,6 +179,9 @@ public class TapService extends AccessibilityService {
                 String time = new SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(new Date());
                 m.name = (wasSmart ? "Smart " : "Recording ") + time;
                 m.steps.addAll(steps);
+                int[] size = ScreenFit.screenSize(this);
+                m.screenW = size[0];
+                m.screenH = size[1];
                 MacroStore.save(this, m);
                 setActive(m);
                 toast("Saved " + steps.size() + " steps");
@@ -218,8 +196,34 @@ public class TapService extends AccessibilityService {
             return;
         }
         recorder = new Recorder(this, wm, smart);
+        recorder.mode = SmartMode.get(this);
         recorder.start();
         bringPanelToFront();
+        updatePanel();
+    }
+
+    void chooseSmartMode(View anchor) {
+        int cur = SmartMode.get(this);
+        try {
+            PopupMenu menu = new PopupMenu(anchor.getContext(), anchor);
+            for (int i = 0; i < SmartMode.NAMES.length; i++) {
+                menu.getMenu().add(0, i, i, SmartMode.NAMES[i]).setCheckable(true).setChecked(i == cur);
+            }
+            menu.setOnMenuItemClickListener(item -> {
+                setSmartMode(item.getItemId());
+                return true;
+            });
+            menu.show();
+        } catch (RuntimeException e) {
+            // popup couldn't attach to the overlay, just cycle instead
+            setSmartMode((cur + 1) % SmartMode.NAMES.length);
+        }
+    }
+
+    private void setSmartMode(int mode) {
+        SmartMode.set(this, mode);
+        if (recorder != null) recorder.mode = mode;
+        toast("Smart record waits for: " + SmartMode.NAMES[mode].toLowerCase(Locale.US));
         updatePanel();
     }
 
@@ -229,7 +233,7 @@ public class TapService extends AccessibilityService {
 
     // ---- play ----
 
-    private void togglePlay() {
+    void togglePlay() {
         if (player != null) {
             player.cancel();
             return;
@@ -239,17 +243,50 @@ public class TapService extends AccessibilityService {
             return;
         }
         boolean needsCapture = false;
-        for (Step s : active.steps) if (s.cond != Step.COND_NONE) needsCapture = true;
+        for (Step s : active.steps) {
+            if (s.cond != Step.COND_NONE || s.action == Step.FIND_IMAGE) needsCapture = true;
+        }
         if (needsCapture && ScreenGrabber.get() == null) {
             toast("Screen capture is off, color/image checks will be skipped");
         }
         player = new Player(this, active, reason -> main.post(() -> {
             player = null;
+            if (stops != null) stops.end();
+            if (indicator != null) indicator.detach();
+            if (panelUi != null) {
+                panelUi.restoreTouch();
+                panelUi.setKeepScreenOn(false);
+            }
             updatePanel();
             if (reason != null) toast(reason);
         }));
+        if (panelUi != null) {
+            panelUi.closePopup();
+            panelUi.setKeepScreenOn(Prefs.keepScreenOn(this));
+        }
         updatePanel();
         player.start();
+        if (stops != null) stops.begin();
+    }
+
+    /** start a macro from a shortcut or the scheduler, returns why it didn't start or null */
+    public String playMacro(Macro m) {
+        if (isBusy()) return "Something is already running";
+        if (m == null || m.steps.isEmpty()) return "That macro has no steps";
+        setActive(m);
+        showPanel();
+        togglePlay();
+        return null;
+    }
+
+    void stopPlay(String reason) {
+        if (player != null) player.cancel(reason);
+    }
+
+    void togglePause() {
+        if (player == null) return;
+        player.setPaused(!player.isPaused());
+        updatePanel();
     }
 
     public void stopAll() {
@@ -265,7 +302,60 @@ public class TapService extends AccessibilityService {
         return player != null || recorder != null;
     }
 
+    // ---- picker / preview ----
+
+    private ScreenOverlay overlay;
+
+    /** crosshair picker, from = start point of a swipe to draw a line from, or null */
+    public boolean showPicker(int x, int y, int[] from, boolean wantColor, PickerOverlay.Listener l) {
+        closeOverlay();
+        overlay = new PickerOverlay(this, x, y, from, wantColor, l);
+        return overlay.show();
+    }
+
+    public boolean showPreview(List<Step> steps, PreviewOverlay.Listener l) {
+        closeOverlay();
+        overlay = new PreviewOverlay(this, steps, l);
+        return overlay.show();
+    }
+
+    public void closeOverlay() {
+        if (overlay != null) overlay.close(false);
+        overlay = null;
+    }
+
     // ---- gestures ----
+
+    /** player thread. sends one step's gesture, getting the panel out of the way if needed */
+    boolean playGesture(Step s, int dx, int dy) throws InterruptedException {
+        int action = s.action;
+        int x = s.x + dx, y = s.y + dy;
+        int x2 = s.x2 + dx, y2 = s.y2 + dy;
+        long duration = s.duration;
+        boolean[] moved = {false};
+        CountDownLatch ready = new CountDownLatch(1);
+        main.post(() -> {
+            if (panelUi != null) moved[0] = panelUi.passThrough(x, y, x2, y2);
+            ready.countDown();
+        });
+        ready.await();
+        try {
+            // window flags take a moment to reach input dispatch
+            if (moved[0]) Thread.sleep(80);
+            if (indicator != null && FloatingPanel.indicatorsOn(this)) {
+                main.post(() -> indicator.show(action, x, y, x2, y2, duration));
+            }
+            return Gestures.play(this, s, dx, dy);
+        } finally {
+            if (moved[0]) main.post(() -> {
+                if (panelUi != null) panelUi.restoreTouch();
+            });
+        }
+    }
+
+    long overlayClearAt() {
+        return indicator == null ? 0 : indicator.clearAt();
+    }
 
     static GestureDescription buildGesture(int action, int x, int y, int x2, int y2, long duration) {
         Path path = new Path();
@@ -277,7 +367,8 @@ public class TapService extends AccessibilityService {
                 .build();
     }
 
-    void dispatch(GestureDescription g, Runnable done) {
+    /** returns false if the system refused the gesture */
+    boolean dispatch(GestureDescription g, Runnable done) {
         boolean ok = dispatchGesture(g, new GestureResultCallback() {
             @Override
             public void onCompleted(GestureDescription gestureDescription) {
@@ -290,16 +381,20 @@ public class TapService extends AccessibilityService {
             }
         }, main);
         if (!ok) main.post(done);
+        return ok;
     }
 
-    /** called from the player thread, returns false if it timed out */
+    /** called from the player thread, returns false if it timed out or was refused */
     boolean dispatchAndWait(GestureDescription g, long duration) throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(1);
-        main.post(() -> dispatch(g, latch::countDown));
-        return latch.await(duration + 3000, TimeUnit.MILLISECONDS);
+        boolean[] sent = {true};
+        main.post(() -> sent[0] = dispatch(g, latch::countDown));
+        return latch.await(duration + 3000, TimeUnit.MILLISECONDS) && sent[0];
     }
 
     void toast(String s) {
-        main.post(() -> Toast.makeText(this, s, Toast.LENGTH_SHORT).show());
+        // app context, so this still works while the service is going down
+        Context app = getApplicationContext();
+        main.post(() -> Toast.makeText(app, s, Toast.LENGTH_SHORT).show());
     }
 }

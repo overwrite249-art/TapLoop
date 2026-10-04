@@ -77,6 +77,30 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/pick_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp">
+
+            <Button
+                android:id="@+id/pick"
+                style="@style/Btn"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="Pick on screen" />
+
+            <Button
+                android:id="@+id/pick_end"
+                style="@style/Btn"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="Pick end" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
@@ -99,7 +123,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
 
-                <TextView style="@style/Label" android:text="Press time (ms)" />
+                <TextView android:id="@+id/dur_label" style="@style/Label" android:text="Press time (ms)" />
 
                 <EditText android:id="@+id/duration" style="@style/Field" android:inputType="number" />
             </LinearLayout>
@@ -117,6 +141,38 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/patch_preview"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@color/line"
+                    android:contentDescription="Recorded image"
+                    android:scaleType="fitXY" />
+
+                <View
+                    android:id="@+id/color_preview"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp" />
+
+                <Button
+                    android:id="@+id/recapture"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="Re-capture from screen now"
+                    android:textSize="12sp" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -180,6 +236,42 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView style="@style/Label" android:text="Check every (ms)" />
+
+                    <EditText
+                        android:id="@+id/interval"
+                        style="@style/Field"
+                        android:hint="0 = every frame"
+                        android:inputType="number" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView style="@style/Label" android:text="Stable for (ms)" />
+
+                    <EditText
+                        android:id="@+id/stable"
+                        style="@style/Field"
+                        android:hint="0 = tap right away"
+                        android:inputType="number" />
+                </LinearLayout>
+            </LinearLayout>
+
             <TextView style="@style/Label" android:text="If it never shows up" />
 
             <Spinner
@@ -187,5 +279,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="44dp" />
         </LinearLayout>
+
+        <include layout="@layout/dialog_step_flow" />
     </LinearLayout>
 </ScrollView>

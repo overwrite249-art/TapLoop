@@ -11,7 +11,7 @@
         android:layout_width="6dp"
         android:layout_height="32dp"
         android:layout_marginEnd="10dp"
-        android:background="@color/accent" />
+        android:background="?android:attr/colorAccent" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -48,4 +48,14 @@
         style="@style/Btn"
         android:layout_height="36dp"
         android:text="Edit" />
+
+    <Button
+        android:id="@+id/more"
+        style="@style/Btn"
+        android:layout_height="36dp"
+        android:layout_marginStart="6dp"
+        android:contentDescription="More"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:text="⋮" />
 </LinearLayout>

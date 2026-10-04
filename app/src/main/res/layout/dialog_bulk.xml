@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp">
+
+    <TextView
+        android:id="@+id/label1"
+        style="@style/Label"
+        android:labelFor="@id/value1" />
+
+    <EditText
+        android:id="@+id/value1"
+        style="@style/Field"
+        android:importantForAutofill="no"
+        android:inputType="number" />
+
+    <LinearLayout
+        android:id="@+id/box2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/label2"
+            style="@style/Label"
+            android:labelFor="@id/value2" />
+
+        <EditText
+            android:id="@+id/value2"
+            style="@style/Field"
+            android:importantForAutofill="no"
+            android:inputType="number" />
+    </LinearLayout>
+</LinearLayout>

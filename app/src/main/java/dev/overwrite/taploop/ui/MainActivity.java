@@ -26,11 +26,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import dev.overwrite.taploop.Prefs;
 import dev.overwrite.taploop.R;
 import dev.overwrite.taploop.capture.CaptureService;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
 import dev.overwrite.taploop.service.TapService;
+import dev.overwrite.taploop.trigger.Shortcuts;
+import dev.overwrite.taploop.trigger.TriggersActivity;
 
 public class MainActivity extends Activity {
     private static final int REQ_CAPTURE = 10;
@@ -39,14 +42,18 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<Macro> macros = new ArrayList<>();
     private Adapter adapter;
+    private MacroListTools tools;
 
     private TextView accState, capState;
     private Button accBtn, capBtn, panelBtn;
     private View accHint, empty;
     private ListView list;
+    private int theme;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        theme = Prefs.theme(this);
+        setTheme(theme);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -61,10 +68,15 @@ public class MainActivity extends Activity {
 
         adapter = new Adapter();
         list.setAdapter(adapter);
+        tools = new MacroListTools(this, this::refresh);
 
         accBtn.setOnClickListener(v -> openAccessibility());
         capBtn.setOnClickListener(v -> toggleCapture());
         panelBtn.setOnClickListener(v -> togglePanel());
+        findViewById(R.id.triggers_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, TriggersActivity.class)));
+        findViewById(R.id.settings_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsActivity.class)));
         accHint.setOnClickListener(v -> startActivity(new Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.fromParts("package", getPackageName(), null))));
@@ -75,7 +87,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // accent changed in settings
+        if (theme != Prefs.theme(this)) {
+            recreate();
+            return;
+        }
         refresh();
+        Shortcuts.update(this);
     }
 
     private void refresh() {
@@ -94,9 +112,12 @@ public class MainActivity extends Activity {
         panelBtn.setText(svc != null && svc.isPanelShown() ? "Hide floating panel" : "Show floating panel");
 
         macros.clear();
-        macros.addAll(MacroStore.all(this));
+        List<Macro> all = MacroStore.all(this);
+        macros.addAll(tools.filter(all));
         adapter.notifyDataSetChanged();
         boolean none = macros.isEmpty();
+        ((TextView) empty).setText(all.isEmpty() ? "No macros yet.\nOpen the panel and hit Rec."
+                : tools.isFiltering() ? "Nothing matches." : "");
         empty.setVisibility(none ? View.VISIBLE : View.GONE);
         list.setVisibility(none ? View.GONE : View.VISIBLE);
     }
@@ -155,6 +176,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (tools.onResult(requestCode, resultCode, data)) return;
         if (requestCode != REQ_CAPTURE) return;
         if (resultCode == RESULT_OK && data != null) {
             CaptureService.start(this, resultCode, data);
@@ -225,6 +247,7 @@ public class MainActivity extends Activity {
             v.findViewById(R.id.use).setOnClickListener(b -> useMacro(m));
             v.findViewById(R.id.edit).setOnClickListener(b -> startActivity(
                     new Intent(MainActivity.this, EditorActivity.class).putExtra("id", m.id)));
+            v.findViewById(R.id.more).setOnClickListener(b -> tools.showItemMenu(b, m));
             return v;
         }
     }

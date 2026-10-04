@@ -64,7 +64,10 @@
         </LinearLayout>
     </LinearLayout>
 
+    <include layout="@layout/editor_flow" />
+
     <LinearLayout
+        android:id="@+id/normal_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
@@ -81,27 +84,187 @@
             android:textStyle="bold" />
 
         <Button
+            android:id="@+id/undo"
+            style="@style/Btn"
+            android:layout_height="34dp"
+            android:layout_marginEnd="6dp"
+            android:contentDescription="Undo"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="↶" />
+
+        <Button
+            android:id="@+id/redo"
+            style="@style/Btn"
+            android:layout_height="34dp"
+            android:layout_marginEnd="6dp"
+            android:contentDescription="Redo"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="↷" />
+
+        <Button
+            android:id="@+id/preview"
+            style="@style/Btn"
+            android:layout_height="34dp"
+            android:layout_marginEnd="8dp"
+            android:text="Preview" />
+
+        <Button
+            android:id="@+id/add_image"
+            style="@style/Btn"
+            android:layout_height="34dp"
+            android:layout_marginEnd="6dp"
+            android:text="+ Image" />
+
+        <Button
             android:id="@+id/add"
             style="@style/Btn"
             android:layout_height="34dp"
             android:text="+ Step" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/select_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="6dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
+
+            <Button
+                android:id="@+id/sel_close"
+                style="@style/Btn"
+                android:layout_height="34dp"
+                android:layout_marginEnd="10dp"
+                android:contentDescription="Done"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="✕" />
+
+            <TextView
+                android:id="@+id/sel_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/accent"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/sel_all"
+                style="@style/Btn"
+                android:layout_height="34dp"
+                android:text="All" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/sel_delete"
+                style="@style/Btn"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Delete"
+                android:textColor="@color/rec" />
+
+            <Button
+                android:id="@+id/sel_dup"
+                style="@style/Btn"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Duplicate" />
+
+            <Button
+                android:id="@+id/sel_edit"
+                style="@style/Btn"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Edit…" />
+
+            <Button
+                android:id="@+id/sel_insert"
+                style="@style/Btn"
+                android:layout_width="0dp"
+                android:layout_height="34dp"
+                android:layout_weight="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Insert…" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <dev.overwrite.taploop.ui.TimelineBar
+        android:id="@+id/timeline"
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:layout_marginBottom="6dp" />
+
     <TextView
+        android:id="@+id/hint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="6dp"
-        android:text="tap a step to edit, long press for more"
+        android:text="tap to edit · drag ≡ to reorder · swipe left to delete · long press to select"
         android:textColor="@color/muted"
         android:textSize="11sp" />
 
-    <ListView
+    <dev.overwrite.taploop.ui.StepListView
         android:id="@+id/steps"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:divider="@null"
         android:dividerHeight="6dp" />
+
+    <LinearLayout
+        android:id="@+id/undo_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/undo_bar"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="2dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/undo_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/text"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/undo_bar_btn"
+            style="@style/Btn"
+            android:background="@null"
+            android:text="Undo"
+            android:textColor="@color/accent"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
