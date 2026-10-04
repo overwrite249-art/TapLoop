@@ -5,6 +5,7 @@ import android.os.SystemClock;
 import dev.overwrite.taploop.capture.ScreenGrabber;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.Step;
+import dev.overwrite.taploop.trigger.TriggerPrefs;
 
 class Player extends Thread {
     interface Done {
@@ -15,6 +16,7 @@ class Player extends Thread {
     private final Macro macro;
     private final Done done;
     private volatile boolean cancelled;
+    private volatile String stopReason;
 
     Player(TapService svc, Macro macro, Done done) {
         super("player");
@@ -28,10 +30,20 @@ class Player extends Thread {
         interrupt();
     }
 
+    /** stop with a message for the toast */
+    void cancel(String reason) {
+        stopReason = reason;
+        cancel();
+    }
+
     @Override
     public void run() {
         String msg = null;
         try {
+            for (int s = TriggerPrefs.countdown(svc); s > 0 && !cancelled; s--) {
+                svc.setStatus("start in\n" + s);
+                Thread.sleep(1000);
+            }
             int loop = 0;
             while (!cancelled && (macro.loops <= 0 || loop < macro.loops)) {
                 loop++;
@@ -70,7 +82,7 @@ class Player extends Thread {
         } catch (InterruptedException ignored) {
             // stop pressed
         } finally {
-            done.onDone(msg);
+            done.onDone(msg != null ? msg : stopReason);
         }
     }
 

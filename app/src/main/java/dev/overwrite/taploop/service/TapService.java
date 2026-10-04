@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -33,6 +34,7 @@ import dev.overwrite.taploop.capture.ScreenGrabber;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
 import dev.overwrite.taploop.model.Step;
+import dev.overwrite.taploop.trigger.Schedule;
 
 public class TapService extends AccessibilityService {
     private static volatile TapService instance;
@@ -53,6 +55,7 @@ public class TapService extends AccessibilityService {
     private Recorder recorder;
     private Player player;
     private Macro active;
+    private StopTriggers stops;
 
     @Override
     protected void onServiceConnected() {
@@ -61,10 +64,18 @@ public class TapService extends AccessibilityService {
         wm = getSystemService(WindowManager.class);
         prefs = getSharedPreferences("state", MODE_PRIVATE);
         active = MacroStore.load(this, prefs.getString("active", null));
+        stops = new StopTriggers(this);
+        Schedule.restore(this);
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+    }
+
+    @Override
+    protected boolean onKeyEvent(KeyEvent event) {
+        if (player != null && stops != null && stops.onKey(event)) return true;
+        return super.onKeyEvent(event);
     }
 
     @Override
@@ -75,6 +86,7 @@ public class TapService extends AccessibilityService {
     @Override
     public void onDestroy() {
         stopAll();
+        if (stops != null) stops.end();
         hidePanel();
         instance = null;
         super.onDestroy();
@@ -245,11 +257,27 @@ public class TapService extends AccessibilityService {
         }
         player = new Player(this, active, reason -> main.post(() -> {
             player = null;
+            stops.end();
             updatePanel();
             if (reason != null) toast(reason);
         }));
         updatePanel();
         player.start();
+        stops.begin();
+    }
+
+    /** start a macro from a shortcut or the scheduler, returns why it didn't start or null */
+    public String playMacro(Macro m) {
+        if (isBusy()) return "Something is already running";
+        if (m == null || m.steps.isEmpty()) return "That macro has no steps";
+        setActive(m);
+        showPanel();
+        togglePlay();
+        return null;
+    }
+
+    void stopPlay(String reason) {
+        if (player != null) player.cancel(reason);
     }
 
     public void stopAll() {

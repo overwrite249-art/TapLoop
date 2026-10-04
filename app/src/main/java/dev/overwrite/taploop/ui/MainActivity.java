@@ -31,6 +31,8 @@ import dev.overwrite.taploop.capture.CaptureService;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
 import dev.overwrite.taploop.service.TapService;
+import dev.overwrite.taploop.trigger.Shortcuts;
+import dev.overwrite.taploop.trigger.TriggersActivity;
 
 public class MainActivity extends Activity {
     private static final int REQ_CAPTURE = 10;
@@ -65,6 +67,8 @@ public class MainActivity extends Activity {
         accBtn.setOnClickListener(v -> openAccessibility());
         capBtn.setOnClickListener(v -> toggleCapture());
         panelBtn.setOnClickListener(v -> togglePanel());
+        findViewById(R.id.triggers_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, TriggersActivity.class)));
         accHint.setOnClickListener(v -> startActivity(new Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.fromParts("package", getPackageName(), null))));
@@ -76,6 +80,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refresh();
+        Shortcuts.update(this);
     }
 
     private void refresh() {

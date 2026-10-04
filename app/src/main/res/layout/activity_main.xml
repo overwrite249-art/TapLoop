@@ -122,6 +122,13 @@
         android:textColor="#0F1115"
         android:textStyle="bold" />
 
+    <Button
+        android:id="@+id/triggers_btn"
+        style="@style/Btn"
+        android:layout_width="match_parent"
+        android:layout_marginTop="8dp"
+        android:text="Triggers: countdown, schedule, shortcuts, auto stop" />
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
