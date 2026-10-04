@@ -35,6 +35,13 @@ class Recorder implements View.OnTouchListener {
     private WindowManager.LayoutParams lp;
     private long lastEnd;
     private boolean passing;
+    private boolean selfHit;
+    private Step inFlight;
+    private int attempt;
+
+    // how long to wait for the window flag to apply before re-sending the touch.
+    // if our own injected touch still lands on the layer we retry with a longer wait.
+    private static final long[] PASS_DELAYS = {50, 120, 250, 500};
 
     private long downTime;
     private int downX, downY, lastX, lastY;
@@ -86,9 +93,16 @@ class Recorder implements View.OnTouchListener {
 
     @Override
     public boolean onTouch(View v, MotionEvent e) {
-        if (passing) return true;
         int x = Math.round(e.getRawX());
         int y = Math.round(e.getRawY());
+        if (passing) {
+            // the flag wasn't applied yet and our replayed touch hit the layer
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN && inFlight != null
+                    && Math.abs(x - inFlight.x) < 12 && Math.abs(y - inFlight.y) < 12) {
+                selfHit = true;
+            }
+            return true;
+        }
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 downTime = e.getEventTime();
@@ -154,16 +168,37 @@ class Recorder implements View.OnTouchListener {
     private void passThrough(Step s) {
         if (layer == null) return;
         passing = true;
+        inFlight = s;
+        attempt = 0;
         lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
         wm.updateViewLayout(layer, lp);
-        // give the window manager a moment to apply the flag before injecting
-        main.postDelayed(() -> svc.dispatch(
-                TapService.buildGesture(s.action, s.x, s.y, s.x2, s.y2, s.duration),
-                this::restore), 40);
+        send();
+    }
+
+    private void send() {
+        Step s = inFlight;
+        selfHit = false;
+        main.postDelayed(() -> {
+            if (layer == null || s == null) return;
+            svc.dispatch(TapService.buildGesture(s.action, s.x, s.y, s.x2, s.y2, s.duration),
+                    this::afterSend);
+        }, PASS_DELAYS[Math.min(attempt, PASS_DELAYS.length - 1)]);
+    }
+
+    private void afterSend() {
+        if (selfHit && attempt < PASS_DELAYS.length - 1 && layer != null) {
+            attempt++;
+            try { wm.updateViewLayout(layer, lp); } catch (Exception ignored) {}
+            send();
+            return;
+        }
+        restore();
     }
 
     private void restore() {
         passing = false;
+        inFlight = null;
+        selfHit = false;
         lastEnd = SystemClock.uptimeMillis();
         if (layer == null) return;
         lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;

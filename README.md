@@ -69,7 +69,7 @@ then `./gradlew assembleRelease`. The GitHub workflow does the same thing from r
 - Single finger only. Multi-touch gestures are recorded as the first finger.
 - Coordinates are absolute, so if you rotate the screen the macro won't line up.
 - Screen frames are captured at half resolution to keep it fast. Image matching is a simple per-pixel diff, not some fancy ML thing, so big UI changes (themes, animations) can throw it off. Bump the tolerance if it misses.
-- While recording, a touch that lands in the ~40 ms right after the previous one is passed through to the app but not recorded.
+- While recording, a touch that lands in the ~50 ms right after the previous one is passed through to the app but not recorded.
 
 ## License
 
