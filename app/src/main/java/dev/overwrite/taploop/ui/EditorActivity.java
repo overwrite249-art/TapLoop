@@ -17,6 +17,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import dev.overwrite.taploop.R;
+import dev.overwrite.taploop.capture.Matcher;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
 import dev.overwrite.taploop.model.Step;
@@ -161,14 +162,11 @@ public class EditorActivity extends Activity {
         View radiusBox = v.findViewById(R.id.radius_box);
 
         action.setAdapter(spinner("Tap / hold", "Swipe", "Just wait"));
-        String[] condNames = s.patch != null
-                ? new String[]{"Always (just use the timing)", "Color is at X,Y", "Recorded image is there"}
-                : new String[]{"Always (just use the timing)", "Color is at X,Y"};
-        cond.setAdapter(spinner(condNames));
+        cond.setAdapter(spinner(DetectViews.NAMES));
         miss.setAdapter(spinner("Tap anyway", "Skip this step", "Stop the macro"));
 
         action.setSelection(s.action);
-        cond.setSelection(Math.min(s.cond, condNames.length - 1));
+        cond.setSelection(DetectViews.indexOf(s.cond));
         miss.setSelection(s.onMiss);
         x.setText(String.valueOf(s.x));
         y.setText(String.valueOf(s.y));
@@ -180,15 +178,16 @@ public class EditorActivity extends Activity {
         tol.setText(String.valueOf(s.tolerance));
         timeout.setText(String.valueOf(s.timeout));
         radius.setText(String.valueOf(s.searchRadius));
+        DetectViews detect = new DetectViews(this, v, s);
 
         Runnable vis = () -> {
             int a = action.getSelectedItemPosition();
-            int c = cond.getSelectedItemPosition();
+            int c = DetectViews.condAt(cond.getSelectedItemPosition());
             endRow.setVisibility(a == Step.SWIPE ? View.VISIBLE : View.GONE);
             durBox.setVisibility(a == Step.WAIT ? View.INVISIBLE : View.VISIBLE);
             condBox.setVisibility(c == Step.COND_NONE ? View.GONE : View.VISIBLE);
-            colorBox.setVisibility(c == Step.COND_COLOR ? View.VISIBLE : View.GONE);
-            radiusBox.setVisibility(c == Step.COND_IMAGE ? View.VISIBLE : View.INVISIBLE);
+            colorBox.setVisibility(Matcher.usesColor(c) ? View.VISIBLE : View.GONE);
+            radiusBox.setVisibility(Matcher.usesImage(c) ? View.VISIBLE : View.INVISIBLE);
         };
         AdapterView.OnItemSelectedListener l = new AdapterView.OnItemSelectedListener() {
             @Override
@@ -209,7 +208,7 @@ public class EditorActivity extends Activity {
                 .setView(v)
                 .setPositiveButton("OK", (d, w) -> {
                     s.action = action.getSelectedItemPosition();
-                    s.cond = cond.getSelectedItemPosition();
+                    s.cond = DetectViews.condAt(cond.getSelectedItemPosition());
                     s.onMiss = miss.getSelectedItemPosition();
                     s.x = num(x, s.x);
                     s.y = num(y, s.y);
@@ -232,6 +231,7 @@ public class EditorActivity extends Activity {
                             Toast.makeText(this, "Bad color, kept the old one", Toast.LENGTH_SHORT).show();
                         }
                     }
+                    detect.apply(s);
                     changed();
                 })
                 .setNegativeButton("Cancel", null)
@@ -268,7 +268,7 @@ public class EditorActivity extends Activity {
             ((TextView) v.findViewById(R.id.title)).setText(s.summary());
             ((TextView) v.findViewById(R.id.sub)).setText(s.details());
             View sw = v.findViewById(R.id.swatch);
-            if (s.cond == Step.COND_COLOR || s.cond == Step.COND_IMAGE) {
+            if (s.cond != Step.COND_NONE) {
                 sw.setVisibility(View.VISIBLE);
                 sw.setBackgroundColor(0xFF000000 | s.color);
             } else {

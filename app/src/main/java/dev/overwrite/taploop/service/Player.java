@@ -1,7 +1,6 @@
 package dev.overwrite.taploop.service;
 
-import android.os.SystemClock;
-
+import dev.overwrite.taploop.capture.Matcher;
 import dev.overwrite.taploop.capture.ScreenGrabber;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.Step;
@@ -47,7 +46,7 @@ class Player extends Thread {
                     if (s.cond != Step.COND_NONE) {
                         ScreenGrabber g = ScreenGrabber.get();
                         if (g != null) {
-                            int[] hit = waitFor(g, s);
+                            int[] hit = Matcher.waitFor(g, s, () -> cancelled);
                             if (hit == null) {
                                 if (s.onMiss == Step.MISS_SKIP) continue;
                                 if (s.onMiss == Step.MISS_STOP) {
@@ -72,34 +71,5 @@ class Player extends Thread {
         } finally {
             done.onDone(msg);
         }
-    }
-
-    /** returns the matched screen point, or null on timeout */
-    private int[] waitFor(ScreenGrabber g, Step s) throws InterruptedException {
-        long end = SystemClock.uptimeMillis() + s.timeout;
-        long seen = -1;
-        while (!cancelled) {
-            long ft = g.frameTime();
-            if (ft != seen) {
-                seen = ft;
-                if (s.cond == Step.COND_COLOR) {
-                    int c = g.colorAt(s.x, s.y);
-                    if (c != -1 && ScreenGrabber.colorDistance(c, s.color) <= s.tolerance) {
-                        return new int[]{s.x, s.y};
-                    }
-                } else {
-                    int[] p = g.findPatch(s.patch, s.patchSize, s.x, s.y, s.searchRadius, s.tolerance);
-                    if (p != null) return p;
-                }
-            }
-            long left = end - SystemClock.uptimeMillis();
-            if (left <= 0) return null;
-            if (!g.hasFrame()) {
-                // capture got stopped mid-run
-                return s.onMiss == Step.MISS_STOP ? null : new int[]{s.x, s.y};
-            }
-            g.awaitFrame(seen, Math.min(50, left));
-        }
-        throw new InterruptedException();
     }
 }

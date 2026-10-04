@@ -24,6 +24,8 @@ import dev.overwrite.taploop.model.Step;
  */
 class Recorder implements View.OnTouchListener {
     final boolean smart;
+    /** SmartMode, can be changed while recording */
+    volatile int mode = SmartMode.IMAGE;
 
     private final TapService svc;
     private final WindowManager wm;
@@ -147,13 +149,12 @@ class Recorder implements View.OnTouchListener {
         s.delay = gap;
 
         if (smart && (downPatch != null || downColor != -1)) {
+            // keep the patch even in color mode so the editor can switch later
             if (downPatch != null) {
-                s.cond = Step.COND_IMAGE;
                 s.patch = downPatch;
                 s.patchSize = ScreenGrabber.PATCH;
-            } else {
-                s.cond = Step.COND_COLOR;
             }
+            s.cond = SmartMode.condFor(mode, downPatch != null, downColor != -1);
             s.color = downColor == -1 ? 0 : downColor;
             // in smart mode we don't wait the recorded time, we wait for the
             // thing to show up. the recorded gap is only used for the timeout.

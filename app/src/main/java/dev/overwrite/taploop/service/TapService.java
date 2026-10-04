@@ -18,6 +18,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.Button;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,6 +50,7 @@ public class TapService extends AccessibilityService {
     private WindowManager.LayoutParams panelLp;
     private TextView status;
     private Button recBtn, smartBtn, playBtn;
+    private TextView smartMode;
 
     private Recorder recorder;
     private Player player;
@@ -109,6 +111,12 @@ public class TapService extends AccessibilityService {
 
         recBtn.setOnClickListener(v -> toggleRecord(false));
         smartBtn.setOnClickListener(v -> toggleRecord(true));
+        smartMode = panel.findViewById(R.id.smart_mode);
+        smartBtn.setOnLongClickListener(v -> {
+            chooseSmartMode();
+            return true;
+        });
+        smartMode.setOnClickListener(v -> chooseSmartMode());
         playBtn.setOnClickListener(v -> togglePlay());
         panel.findViewById(R.id.close).setOnClickListener(v -> {
             stopAll();
@@ -188,6 +196,7 @@ public class TapService extends AccessibilityService {
         playBtn.setEnabled(!rec);
         playBtn.setText(playing ? "Stop" : "Play");
         playBtn.setTextColor(playing ? 0xFFFF5A5F : Color.WHITE);
+        smartMode.setText(SmartMode.shortName(SmartMode.get(this)));
         if (rec) status.setText("rec " + recorder.count());
         else if (!playing) status.setText(active == null ? "no macro" : active.name);
     }
@@ -218,8 +227,35 @@ public class TapService extends AccessibilityService {
             return;
         }
         recorder = new Recorder(this, wm, smart);
+        recorder.mode = SmartMode.get(this);
         recorder.start();
         bringPanelToFront();
+        updatePanel();
+    }
+
+    private void chooseSmartMode() {
+        if (panel == null) return;
+        int cur = SmartMode.get(this);
+        try {
+            PopupMenu menu = new PopupMenu(panel.getContext(), smartBtn);
+            for (int i = 0; i < SmartMode.NAMES.length; i++) {
+                menu.getMenu().add(0, i, i, SmartMode.NAMES[i]).setCheckable(true).setChecked(i == cur);
+            }
+            menu.setOnMenuItemClickListener(item -> {
+                setSmartMode(item.getItemId());
+                return true;
+            });
+            menu.show();
+        } catch (RuntimeException e) {
+            // popup couldn't attach to the overlay, just cycle instead
+            setSmartMode((cur + 1) % SmartMode.NAMES.length);
+        }
+    }
+
+    private void setSmartMode(int mode) {
+        SmartMode.set(this, mode);
+        if (recorder != null) recorder.mode = mode;
+        toast("Smart record waits for: " + SmartMode.NAMES[mode].toLowerCase(Locale.US));
         updatePanel();
     }
 

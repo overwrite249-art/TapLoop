@@ -13,6 +13,10 @@ public class Step {
     public static final int COND_NONE = 0;
     public static final int COND_COLOR = 1;
     public static final int COND_IMAGE = 2;
+    public static final int COND_COLOR_GONE = 3;
+    public static final int COND_IMAGE_GONE = 4;
+    public static final int COND_EITHER = 5;
+    public static final int COND_BOTH = 6;
 
     public static final int MISS_TAP = 0;
     public static final int MISS_SKIP = 1;
@@ -34,6 +38,10 @@ public class Step {
     public int searchRadius;
     public int patchSize;
     public byte[] patch;
+    /** how often to look while waiting, 0 = every new frame */
+    public long interval;
+    /** the match has to hold this long before we tap */
+    public long stable;
 
     public Step copy() {
         Step s = new Step();
@@ -42,6 +50,7 @@ public class Step {
         s.cond = cond; s.color = color; s.tolerance = tolerance; s.timeout = timeout;
         s.onMiss = onMiss; s.searchRadius = searchRadius;
         s.patchSize = patchSize; s.patch = patch;
+        s.interval = interval; s.stable = stable;
         return s;
     }
 
@@ -52,6 +61,8 @@ public class Step {
         o.put("delay", delay).put("duration", duration);
         o.put("cond", cond).put("color", color).put("tol", tolerance);
         o.put("timeout", timeout).put("miss", onMiss).put("radius", searchRadius);
+        if (interval > 0) o.put("interval", interval);
+        if (stable > 0) o.put("stable", stable);
         if (patch != null) {
             o.put("psize", patchSize);
             o.put("patch", Base64.encodeToString(patch, Base64.NO_WRAP));
@@ -73,7 +84,12 @@ public class Step {
             s.patch = Base64.decode(p, Base64.NO_WRAP);
             s.patchSize = o.optInt("psize");
         }
-        if (s.cond == COND_IMAGE && s.patch == null) s.cond = COND_NONE;
+        s.interval = Math.max(0, o.optLong("interval"));
+        s.stable = Math.max(0, o.optLong("stable"));
+        if (s.patch == null) {
+            if (s.cond == COND_IMAGE || s.cond == COND_IMAGE_GONE) s.cond = COND_NONE;
+            else if (s.cond == COND_EITHER || s.cond == COND_BOTH) s.cond = COND_COLOR;
+        }
         return s;
     }
 
@@ -92,8 +108,17 @@ public class Step {
         StringBuilder b = new StringBuilder();
         b.append("after ").append(delay).append(" ms");
         if (action != WAIT) b.append(" · ").append(duration).append(" ms down");
-        if (cond == COND_COLOR) b.append(" · color ").append(String.format("#%06X", color & 0xFFFFFF));
-        else if (cond == COND_IMAGE) b.append(" · image");
+        String hex = String.format("#%06X", color & 0xFFFFFF);
+        switch (cond) {
+            case COND_COLOR: b.append(" · color ").append(hex); break;
+            case COND_COLOR_GONE: b.append(" · no ").append(hex); break;
+            case COND_IMAGE: b.append(" · image"); break;
+            case COND_IMAGE_GONE: b.append(" · image gone"); break;
+            case COND_EITHER: b.append(" · color or image"); break;
+            case COND_BOTH: b.append(" · color + image"); break;
+            default: break;
+        }
+        if (cond != COND_NONE && stable > 0) b.append(" · stable ").append(stable).append(" ms");
         return b.toString();
     }
 }
