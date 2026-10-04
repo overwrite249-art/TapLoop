@@ -12,6 +12,7 @@ import android.view.ViewConfiguration;
 import android.view.WindowManager;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import dev.overwrite.taploop.R;
@@ -48,6 +49,12 @@ class Recorder implements View.OnTouchListener {
     private boolean moved;
     private int downColor = -1;
     private byte[] downPatch;
+
+    // finger path for swipes, x,y,t triples
+    private static final int MAX_POINTS = 400;
+    private int[] pts = new int[MAX_POINTS * 3];
+    private int npts;
+    private long minGap;
 
     Recorder(TapService svc, WindowManager wm, boolean smart) {
         this.svc = svc;
@@ -111,6 +118,9 @@ class Recorder implements View.OnTouchListener {
                 moved = false;
                 downColor = -1;
                 downPatch = null;
+                npts = 0;
+                minGap = 16;
+                addPoint(x, y, 0, true);
                 if (smart) {
                     ScreenGrabber g = ScreenGrabber.get();
                     if (g != null) {
@@ -120,6 +130,12 @@ class Recorder implements View.OnTouchListener {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
+                float ox = e.getRawX() - e.getX(), oy = e.getRawY() - e.getY();
+                for (int h = 0; h < e.getHistorySize(); h++) {
+                    addPoint(Math.round(e.getHistoricalX(h) + ox), Math.round(e.getHistoricalY(h) + oy),
+                            e.getHistoricalEventTime(h) - downTime, false);
+                }
+                addPoint(x, y, e.getEventTime() - downTime, false);
                 lastX = x;
                 lastY = y;
                 if (Math.hypot(x - downX, y - downY) > slop) moved = true;
@@ -127,12 +143,51 @@ class Recorder implements View.OnTouchListener {
             case MotionEvent.ACTION_UP:
                 lastX = x;
                 lastY = y;
+                addPoint(x, y, e.getEventTime() - downTime, true);
                 finishTouch(e.getEventTime());
                 break;
             default:
                 break;
         }
         return true;
+    }
+
+    private void addPoint(int x, int y, long t, boolean force) {
+        if (npts > 0) {
+            int last = (npts - 1) * 3;
+            long dt = t - pts[last + 2];
+            if (!force && dt < minGap) return;
+            if (dt <= 0) {
+                pts[last] = x;
+                pts[last + 1] = y;
+                return;
+            }
+            // finger is resting, just stretch the last point instead of piling up copies
+            if (npts > 1 && same(last, x, y) && same(last - 3, x, y)) {
+                pts[last + 2] = (int) t;
+                return;
+            }
+        }
+        if (npts == MAX_POINTS) {
+            // too long, drop every other point and sample half as often from now on
+            int keep = 0;
+            for (int i = 0; i < npts; i += 2, keep++) System.arraycopy(pts, i * 3, pts, keep * 3, 3);
+            if ((npts - 1) % 2 != 0) {
+                System.arraycopy(pts, (npts - 1) * 3, pts, keep * 3, 3);
+                keep++;
+            }
+            npts = keep;
+            minGap *= 2;
+        }
+        int i = npts * 3;
+        pts[i] = x;
+        pts[i + 1] = y;
+        pts[i + 2] = (int) t;
+        npts++;
+    }
+
+    private boolean same(int i, int x, int y) {
+        return Math.abs(pts[i] - x) <= 2 && Math.abs(pts[i + 1] - y) <= 2;
     }
 
     private void finishTouch(long upTime) {
@@ -143,6 +198,10 @@ class Recorder implements View.OnTouchListener {
         s.x2 = moved ? lastX : downX;
         s.y2 = moved ? lastY : downY;
         s.duration = Math.max(10, upTime - downTime);
+        if (moved && npts >= 3) {
+            s.path = Arrays.copyOf(pts, npts * 3);
+            s.path[s.path.length - 1] = (int) s.duration;
+        }
         long gap = Math.max(0, downTime - lastEnd);
         s.delay = gap;
 
@@ -180,8 +239,7 @@ class Recorder implements View.OnTouchListener {
         selfHit = false;
         main.postDelayed(() -> {
             if (layer == null || s == null) return;
-            svc.dispatch(TapService.buildGesture(s.action, s.x, s.y, s.x2, s.y2, s.duration),
-                    this::afterSend);
+            Gestures.send(svc, Gestures.build(s, 0, 0), this::afterSend);
         }, PASS_DELAYS[Math.min(attempt, PASS_DELAYS.length - 1)]);
     }
 

@@ -160,14 +160,13 @@ public class EditorActivity extends Activity {
         View condBox = v.findViewById(R.id.cond_box), colorBox = v.findViewById(R.id.color_box);
         View radiusBox = v.findViewById(R.id.radius_box);
 
-        action.setAdapter(spinner("Tap / hold", "Swipe", "Just wait"));
+        GestureSection gs = new GestureSection(this, v, s);
         String[] condNames = s.patch != null
                 ? new String[]{"Always (just use the timing)", "Color is at X,Y", "Recorded image is there"}
                 : new String[]{"Always (just use the timing)", "Color is at X,Y"};
         cond.setAdapter(spinner(condNames));
         miss.setAdapter(spinner("Tap anyway", "Skip this step", "Stop the macro"));
 
-        action.setSelection(s.action);
         cond.setSelection(Math.min(s.cond, condNames.length - 1));
         miss.setSelection(s.onMiss);
         x.setText(String.valueOf(s.x));
@@ -182,13 +181,14 @@ public class EditorActivity extends Activity {
         radius.setText(String.valueOf(s.searchRadius));
 
         Runnable vis = () -> {
-            int a = action.getSelectedItemPosition();
+            int a = gs.action();
             int c = cond.getSelectedItemPosition();
             endRow.setVisibility(a == Step.SWIPE ? View.VISIBLE : View.GONE);
             durBox.setVisibility(a == Step.WAIT ? View.INVISIBLE : View.VISIBLE);
             condBox.setVisibility(c == Step.COND_NONE ? View.GONE : View.VISIBLE);
             colorBox.setVisibility(c == Step.COND_COLOR ? View.VISIBLE : View.GONE);
             radiusBox.setVisibility(c == Step.COND_IMAGE ? View.VISIBLE : View.INVISIBLE);
+            gs.refresh();
         };
         AdapterView.OnItemSelectedListener l = new AdapterView.OnItemSelectedListener() {
             @Override
@@ -208,7 +208,7 @@ public class EditorActivity extends Activity {
                 .setTitle("Step " + (pos + 1))
                 .setView(v)
                 .setPositiveButton("OK", (d, w) -> {
-                    s.action = action.getSelectedItemPosition();
+                    s.action = gs.action();
                     s.cond = cond.getSelectedItemPosition();
                     s.onMiss = miss.getSelectedItemPosition();
                     s.x = num(x, s.x);
@@ -221,6 +221,7 @@ public class EditorActivity extends Activity {
                     }
                     s.delay = Math.max(0, num(delay, (int) s.delay));
                     s.duration = Math.max(1, num(duration, (int) s.duration));
+                    gs.apply(s);
                     s.tolerance = Math.max(0, Math.min(255, num(tol, s.tolerance)));
                     s.timeout = Math.max(0, num(timeout, (int) s.timeout));
                     s.searchRadius = Math.max(0, Math.min(400, num(radius, s.searchRadius)));

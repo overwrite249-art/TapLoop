@@ -61,8 +61,7 @@ class Player extends Thread {
                         }
                     }
                     if (s.action == Step.WAIT) continue;
-                    svc.dispatchAndWait(TapService.buildGesture(s.action,
-                            s.x + dx, s.y + dy, s.x2 + dx, s.y2 + dy, s.duration), s.duration);
+                    Gestures.play(svc, s, dx, dy);
                 }
                 if (macro.loopDelay > 0 && !cancelled) Thread.sleep(macro.loopDelay);
             }

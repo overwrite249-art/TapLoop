@@ -99,7 +99,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
 
-                <TextView style="@style/Label" android:text="Press time (ms)" />
+                <TextView android:id="@+id/dur_label" style="@style/Label" android:text="Press time (ms)" />
 
                 <EditText android:id="@+id/duration" style="@style/Field" android:inputType="number" />
             </LinearLayout>
