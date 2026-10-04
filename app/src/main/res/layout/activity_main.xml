@@ -132,6 +132,8 @@
         android:textSize="17sp"
         android:textStyle="bold" />
 
+    <include layout="@layout/macro_tools" />
+
     <ListView
         android:id="@+id/list"
         android:layout_width="match_parent"

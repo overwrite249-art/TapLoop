@@ -15,6 +15,8 @@ public class Macro {
     /** playback speed in percent, only scales plain delays */
     public int speed = 100;
     public long loopDelay = 0;
+    /** optional folder name for the main list, empty = none */
+    public String folder = "";
     public final List<Step> steps = new ArrayList<>();
 
     public JSONObject toJson() throws JSONException {
@@ -23,6 +25,7 @@ public class Macro {
         JSONArray arr = new JSONArray();
         for (Step s : steps) arr.put(s.toJson());
         o.put("steps", arr);
+        if (folder != null && !folder.isEmpty()) o.put("folder", folder);
         return o;
     }
 
@@ -33,6 +36,7 @@ public class Macro {
         m.loops = o.optInt("loops", 1);
         m.speed = Math.max(10, o.optInt("speed", 100));
         m.loopDelay = o.optLong("loopDelay", 0);
+        m.folder = o.optString("folder", "").trim();
         JSONArray arr = o.optJSONArray("steps");
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
