@@ -120,6 +120,18 @@ public final class ScreenGrabber {
         }
     }
 
+    public interface FrameReader<T> {
+        T read(byte[] rgba, int stride, int width, int height);
+    }
+
+    /** runs r on the latest frame while holding the lock, keep it quick. null if no frame */
+    public <T> T withFrame(FrameReader<T> r) {
+        synchronized (lock) {
+            if (frame == null) return null;
+            return r.read(frame, stride, w, h);
+        }
+    }
+
     private int fx(int sx) { return clamp(Math.round(sx * SCALE), w - 1); }
     private int fy(int sy) { return clamp(Math.round(sy * SCALE), h - 1); }
 

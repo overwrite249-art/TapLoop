@@ -9,6 +9,8 @@ public class Step {
     public static final int TAP = 0;
     public static final int SWIPE = 1;
     public static final int WAIT = 2;
+    /** look for a template on screen and tap where it is, has its own dialog */
+    public static final int FIND_IMAGE = 3;
 
     public static final int COND_NONE = 0;
     public static final int COND_COLOR = 1;
@@ -35,6 +37,17 @@ public class Step {
     public int patchSize;
     public byte[] patch;
 
+    // find image: RGB template, tplScale = template px per frame px (< 1 if it got shrunk)
+    public byte[] tpl;
+    public int tplW, tplH;
+    public float tplScale = 1f;
+    /** search area in screen px, areaW 0 = whole screen */
+    public int areaX, areaY, areaW, areaH;
+    /** tap this far from the template center */
+    public int offX, offY;
+    /** how similar it has to be, percent */
+    public int match = 85;
+
     public Step copy() {
         Step s = new Step();
         s.action = action; s.x = x; s.y = y; s.x2 = x2; s.y2 = y2;
@@ -42,6 +55,9 @@ public class Step {
         s.cond = cond; s.color = color; s.tolerance = tolerance; s.timeout = timeout;
         s.onMiss = onMiss; s.searchRadius = searchRadius;
         s.patchSize = patchSize; s.patch = patch;
+        s.tpl = tpl; s.tplW = tplW; s.tplH = tplH; s.tplScale = tplScale;
+        s.areaX = areaX; s.areaY = areaY; s.areaW = areaW; s.areaH = areaH;
+        s.offX = offX; s.offY = offY; s.match = match;
         return s;
     }
 
@@ -55,6 +71,12 @@ public class Step {
         if (patch != null) {
             o.put("psize", patchSize);
             o.put("patch", Base64.encodeToString(patch, Base64.NO_WRAP));
+        }
+        if (tpl != null) {
+            o.put("tpl", Base64.encodeToString(tpl, Base64.NO_WRAP));
+            o.put("tw", tplW).put("th", tplH).put("ts", (double) tplScale);
+            o.put("ax", areaX).put("ay", areaY).put("aw", areaW).put("ah", areaH);
+            o.put("ox", offX).put("oy", offY).put("match", match);
         }
         return o;
     }
@@ -74,7 +96,26 @@ public class Step {
             s.patchSize = o.optInt("psize");
         }
         if (s.cond == COND_IMAGE && s.patch == null) s.cond = COND_NONE;
+        String t = o.optString("tpl", null);
+        if (t != null && !t.isEmpty()) {
+            try {
+                s.tpl = Base64.decode(t, Base64.NO_WRAP);
+            } catch (IllegalArgumentException ignored) {
+                // broken template, treated as missing below
+            }
+            s.tplW = o.optInt("tw"); s.tplH = o.optInt("th");
+            s.tplScale = (float) o.optDouble("ts", 1);
+            s.areaX = o.optInt("ax"); s.areaY = o.optInt("ay");
+            s.areaW = o.optInt("aw"); s.areaH = o.optInt("ah");
+            s.offX = o.optInt("ox"); s.offY = o.optInt("oy");
+            s.match = o.optInt("match", 85);
+        }
+        if (s.action == FIND_IMAGE && !s.hasTemplate()) s.action = TAP;
         return s;
+    }
+
+    public boolean hasTemplate() {
+        return tpl != null && tplW > 0 && tplH > 0 && tpl.length >= tplW * tplH * 3;
     }
 
     public String summary() {
@@ -83,6 +124,10 @@ public class Step {
             case SWIPE: b.append("Swipe ").append(x).append(',').append(y)
                     .append(" → ").append(x2).append(',').append(y2); break;
             case WAIT: b.append("Wait"); break;
+            case FIND_IMAGE:
+                b.append("Find image");
+                if (offX != 0 || offY != 0) b.append(", tap ").append(offX).append(',').append(offY).append(" off");
+                break;
             default: b.append(duration >= 400 ? "Hold " : "Tap ").append(x).append(',').append(y);
         }
         return b.toString();
@@ -92,6 +137,10 @@ public class Step {
         StringBuilder b = new StringBuilder();
         b.append("after ").append(delay).append(" ms");
         if (action != WAIT) b.append(" · ").append(duration).append(" ms down");
+        if (action == FIND_IMAGE) {
+            b.append(" · ").append(match).append("% · ").append(areaW > 0 ? "in area" : "whole screen");
+            return b.toString();
+        }
         if (cond == COND_COLOR) b.append(" · color ").append(String.format("#%06X", color & 0xFFFFFF));
         else if (cond == COND_IMAGE) b.append(" · image");
         return b.toString();

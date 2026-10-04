@@ -2,6 +2,7 @@ package dev.overwrite.taploop.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -16,13 +17,19 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import dev.overwrite.taploop.R;
+import dev.overwrite.taploop.capture.ScreenGrabber;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.MacroStore;
 import dev.overwrite.taploop.model.Step;
 import dev.overwrite.taploop.service.TapService;
 
 public class EditorActivity extends Activity {
+    private static final int REQ_CROP = 1;
+
     private Macro macro;
     private EditText name, loops, speed, loopDelay;
     private TextView count;
@@ -73,6 +80,7 @@ public class EditorActivity extends Activity {
             changed();
             editStep(macro.steps.size() - 1);
         });
+        findViewById(R.id.add_image).setOnClickListener(v -> newImageStep());
         findViewById(R.id.save).setOnClickListener(v -> {
             save();
             finish();
@@ -90,6 +98,45 @@ public class EditorActivity extends Activity {
                 .setNegativeButton("Cancel", null)
                 .show());
         changed();
+    }
+
+    private void newImageStep() {
+        ScreenGrabber g = ScreenGrabber.get();
+        if (g == null || !g.hasFrame()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Screen capture is off")
+                    .setMessage("Image steps need a screenshot. Turn on screen capture on the main screen, then come back here.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("New image step from screenshot")
+                .setMessage("Switch to the app you want to automate. TapLoop grabs the screen after 5 seconds and comes back so you can mark the image.")
+                .setPositiveButton("Grab in 5 s", (d, w) -> startCrop(5000))
+                .setNeutralButton("Grab now", (d, w) -> startCrop(0))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startCrop(long delay) {
+        startActivityForResult(new Intent(this, CropActivity.class)
+                .putExtra(CropActivity.EXTRA_DELAY, delay), REQ_CROP);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_CROP || resultCode != RESULT_OK || data == null) return;
+        String json = data.getStringExtra(CropActivity.EXTRA_STEP);
+        if (json == null) return;
+        try {
+            macro.steps.add(Step.fromJson(new JSONObject(json)));
+        } catch (JSONException e) {
+            return;
+        }
+        changed();
+        editStep(macro.steps.size() - 1);
     }
 
     private void changed() {
@@ -146,6 +193,10 @@ public class EditorActivity extends Activity {
 
     private void editStep(int pos) {
         Step s = macro.steps.get(pos);
+        if (s.action == Step.FIND_IMAGE) {
+            ImageStepDialog.show(this, s, pos, this::changed);
+            return;
+        }
         View v = getLayoutInflater().inflate(R.layout.dialog_step, null);
 
         Spinner action = v.findViewById(R.id.action);

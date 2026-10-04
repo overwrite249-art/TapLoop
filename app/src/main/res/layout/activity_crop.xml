@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Waiting for the screenshot..."
+        android:textColor="@color/muted"
+        android:textSize="12sp" />
+
+    <dev.overwrite.taploop.ui.CropView
+        android:id="@+id/crop"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/card" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp">
+
+        <Button
+            android:id="@+id/mode_tpl"
+            style="@style/Btn"
+            android:layout_width="0dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:text="Image" />
+
+        <Button
+            android:id="@+id/mode_area"
+            style="@style/Btn"
+            android:layout_width="0dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:text="Search area" />
+
+        <Button
+            android:id="@+id/whole"
+            style="@style/Btn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:text="Whole screen" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/retake"
+            style="@style/Btn"
+            android:layout_height="46dp"
+            android:layout_marginEnd="8dp"
+            android:text="Retake in 5 s" />
+
+        <Button
+            android:id="@+id/use"
+            style="@style/Btn"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            android:background="@drawable/btn_accent"
+            android:text="Use this"
+            android:textColor="#0F1115"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

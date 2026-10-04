@@ -3,6 +3,7 @@ package dev.overwrite.taploop.service;
 import android.os.SystemClock;
 
 import dev.overwrite.taploop.capture.ScreenGrabber;
+import dev.overwrite.taploop.capture.TemplateMatcher;
 import dev.overwrite.taploop.model.Macro;
 import dev.overwrite.taploop.model.Step;
 
@@ -42,6 +43,22 @@ class Player extends Thread {
 
                     long d = s.delay * 100 / Math.max(10, macro.speed);
                     if (d > 0) Thread.sleep(d);
+
+                    if (s.action == Step.FIND_IMAGE) {
+                        int[] hit = TemplateMatcher.waitFor(ScreenGrabber.get(), s);
+                        if (hit == null) {
+                            if (s.onMiss == Step.MISS_SKIP) continue;
+                            if (s.onMiss == Step.MISS_STOP) {
+                                msg = "Stopped, step " + (i + 1) + " image not found";
+                                return;
+                            }
+                            // tap anyway: where the image was when it was cut
+                            hit = new int[]{s.x, s.y};
+                        }
+                        int tx = hit[0] + s.offX, ty = hit[1] + s.offY;
+                        svc.dispatchAndWait(TapService.buildGesture(Step.TAP, tx, ty, tx, ty, s.duration), s.duration);
+                        continue;
+                    }
 
                     int dx = 0, dy = 0;
                     if (s.cond != Step.COND_NONE) {

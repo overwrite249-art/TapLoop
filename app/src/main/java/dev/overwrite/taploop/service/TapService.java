@@ -239,7 +239,9 @@ public class TapService extends AccessibilityService {
             return;
         }
         boolean needsCapture = false;
-        for (Step s : active.steps) if (s.cond != Step.COND_NONE) needsCapture = true;
+        for (Step s : active.steps) {
+            if (s.cond != Step.COND_NONE || s.action == Step.FIND_IMAGE) needsCapture = true;
+        }
         if (needsCapture && ScreenGrabber.get() == null) {
             toast("Screen capture is off, color/image checks will be skipped");
         }
