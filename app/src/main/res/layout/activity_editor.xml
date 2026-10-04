@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/name"
+        style="@style/Field"
+        android:hint="Name"
+        android:inputType="text"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView style="@style/Label" android:text="Loops (0 = forever)" />
+
+            <EditText
+                android:id="@+id/loops"
+                style="@style/Field"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView style="@style/Label" android:text="Speed %" />
+
+            <EditText
+                android:id="@+id/speed"
+                style="@style/Field"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView style="@style/Label" android:text="Pause between loops" />
+
+            <EditText
+                android:id="@+id/loop_delay"
+                style="@style/Field"
+                android:hint="ms"
+                android:inputType="number" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="6dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/count"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/text"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/add"
+            style="@style/Btn"
+            android:layout_height="34dp"
+            android:text="+ Step" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="tap a step to edit, long press for more"
+        android:textColor="@color/muted"
+        android:textSize="11sp" />
+
+    <ListView
+        android:id="@+id/steps"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="6dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp">
+
+        <Button
+            android:id="@+id/delete"
+            style="@style/Btn"
+            android:layout_height="46dp"
+            android:layout_marginEnd="8dp"
+            android:text="Delete"
+            android:textColor="@color/rec" />
+
+        <Button
+            android:id="@+id/save"
+            style="@style/Btn"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            android:background="@drawable/btn_accent"
+            android:text="Save"
+            android:textColor="#0F1115"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>
