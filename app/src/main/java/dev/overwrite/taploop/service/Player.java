@@ -15,6 +15,8 @@ class Player extends Thread {
     private final Macro macro;
     private final Done done;
     private volatile boolean cancelled;
+    private volatile boolean paused;
+    private final Object pauseLock = new Object();
 
     Player(TapService svc, Macro macro, Done done) {
         super("player");
@@ -28,6 +30,41 @@ class Player extends Thread {
         interrupt();
     }
 
+    boolean isPaused() {
+        return paused;
+    }
+
+    void setPaused(boolean p) {
+        synchronized (pauseLock) {
+            paused = p;
+            pauseLock.notifyAll();
+        }
+    }
+
+    /** blocks while paused, returns how long we sat there */
+    private long holdIfPaused() throws InterruptedException {
+        if (!paused) return 0;
+        long t0 = SystemClock.uptimeMillis();
+        synchronized (pauseLock) {
+            while (paused && !cancelled) pauseLock.wait();
+        }
+        if (cancelled) throw new InterruptedException();
+        return SystemClock.uptimeMillis() - t0;
+    }
+
+    /** like Thread.sleep but the clock stops while paused */
+    private void doze(long ms) throws InterruptedException {
+        long end = SystemClock.uptimeMillis() + ms;
+        while (true) {
+            end += holdIfPaused();
+            long left = end - SystemClock.uptimeMillis();
+            if (left <= 0) return;
+            synchronized (pauseLock) {
+                if (!paused) pauseLock.wait(left);
+            }
+        }
+    }
+
     @Override
     public void run() {
         String msg = null;
@@ -36,12 +73,12 @@ class Player extends Thread {
             while (!cancelled && (macro.loops <= 0 || loop < macro.loops)) {
                 loop++;
                 for (int i = 0; i < macro.steps.size() && !cancelled; i++) {
+                    holdIfPaused();
                     Step s = macro.steps.get(i);
-                    String total = macro.loops <= 0 ? "∞" : String.valueOf(macro.loops);
-                    svc.setStatus(loop + "/" + total + "\n#" + (i + 1));
+                    svc.onProgress(loop, macro.loops, i + 1, macro.steps.size());
 
                     long d = s.delay * 100 / Math.max(10, macro.speed);
-                    if (d > 0) Thread.sleep(d);
+                    if (d > 0) doze(d);
 
                     int dx = 0, dy = 0;
                     if (s.cond != Step.COND_NONE) {
@@ -61,10 +98,9 @@ class Player extends Thread {
                         }
                     }
                     if (s.action == Step.WAIT) continue;
-                    svc.dispatchAndWait(TapService.buildGesture(s.action,
-                            s.x + dx, s.y + dy, s.x2 + dx, s.y2 + dy, s.duration), s.duration);
+                    svc.playGesture(s.action, s.x + dx, s.y + dy, s.x2 + dx, s.y2 + dy, s.duration);
                 }
-                if (macro.loopDelay > 0 && !cancelled) Thread.sleep(macro.loopDelay);
+                if (macro.loopDelay > 0 && !cancelled) doze(macro.loopDelay);
             }
             if (!cancelled) msg = "Done";
         } catch (InterruptedException ignored) {
@@ -76,9 +112,18 @@ class Player extends Thread {
 
     /** returns the matched screen point, or null on timeout */
     private int[] waitFor(ScreenGrabber g, Step s) throws InterruptedException {
-        long end = SystemClock.uptimeMillis() + s.timeout;
+        // start counting once our own tap marker is gone from the screen
+        long clear = svc.overlayClearAt();
+        long end = Math.max(SystemClock.uptimeMillis(), clear) + s.timeout;
         long seen = -1;
         while (!cancelled) {
+            end += holdIfPaused();
+            long now = SystemClock.uptimeMillis();
+            if (now < clear) {
+                // the marker might still be in the frame
+                Thread.sleep(Math.min(clear - now, 50));
+                continue;
+            }
             long ft = g.frameTime();
             if (ft != seen) {
                 seen = ft;
